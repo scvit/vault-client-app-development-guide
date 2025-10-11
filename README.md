@@ -23,6 +23,21 @@ Development-Guide/
 │   ├── config.ini                      # 설정 파일
 │   ├── config.h                        # 설정 헤더
 │   └── Makefile                        # 빌드 설정
+├── cpp-app/                            # C++ Vault 클라이언트 예제
+│   ├── README.md                       # C++ 예제 사용법
+│   ├── CMakeLists.txt                  # CMake 빌드 설정
+│   ├── config.ini                      # 설정 파일 (C 버전과 동일)
+│   ├── include/                        # 헤더 파일들
+│   │   ├── Config.hpp                  # 설정 관리 클래스
+│   │   ├── HttpClient.hpp              # HTTP 클라이언트 래퍼
+│   │   └── VaultClient.hpp             # Vault 클라이언트 클래스
+│   ├── src/                            # 소스 파일들
+│   │   ├── main.cpp                    # 메인 애플리케이션
+│   │   ├── Config.cpp                  # 설정 구현
+│   │   ├── HttpClient.cpp              # HTTP 클라이언트 구현
+│   │   └── VaultClient.cpp             # Vault 클라이언트 구현
+│   └── third_party/                    # 서드파티 라이브러리
+│       └── json.hpp                    # nlohmann/json 헤더
 └── pure-java-app/                      # Java Vault 클라이언트 예제
     ├── README.md                       # Java 예제 사용법
     ├── src/main/java/com/example/vault/ # Java 소스 코드
@@ -62,6 +77,16 @@ Development-Guide/
   - Entity 기반 권한, 자동 토큰 갱신
 - **빌드**: `make` 명령어로 간단 빌드
 - **실행**: `./vault-app` 실행
+
+### C++ 예제 ([cpp-app/](./cpp-app/))
+- **언어**: C++17 (libcurl + nlohmann/json)
+- **특징**:
+  - 모던 C++17 스타일, RAII 패턴, 스마트 포인터
+  - CMake 기반 크로스 플랫폼 빌드
+  - 스레드 안전성 (std::mutex, std::atomic)
+  - C 버전과 동일한 기능 및 설정 호환성
+- **빌드**: `mkdir build && cd build && cmake .. && make`
+- **실행**: `./vault-app`
 
 ### Java 예제 ([pure-java-app/](./pure-java-app/))
 - **언어**: Java 11+ (Apache HttpClient + Jackson)
@@ -188,6 +213,13 @@ Development-Guide/
 ```bash
 # C언어 예제
 cd c-app
+make
+./vault-app
+
+# C++ 예제
+cd cpp-app
+mkdir build && cd build
+cmake ..
 make
 ./vault-app
 
