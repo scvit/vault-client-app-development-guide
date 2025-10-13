@@ -38,16 +38,29 @@ Development-Guide/
 │   │   └── VaultClient.cpp             # Vault 클라이언트 구현
 │   └── third_party/                    # 서드파티 라이브러리
 │       └── json.hpp                    # nlohmann/json 헤더
-└── pure-java-app/                      # Java Vault 클라이언트 예제
-    ├── README.md                       # Java 예제 사용법
-    ├── src/main/java/com/example/vault/ # Java 소스 코드
-    │   ├── VaultApplication.java        # 메인 애플리케이션
-    │   ├── client/VaultClient.java      # Vault 클라이언트
-    │   └── config/VaultConfig.java      # 설정 관리
-    ├── src/main/resources/             # 리소스 파일
-    │   ├── config.properties            # 설정 파일
-    │   └── logback.xml                  # 로깅 설정
-    └── pom.xml                          # Maven 설정
+├── pure-java-app/                      # Java Vault 클라이언트 예제
+│   ├── README.md                       # Java 예제 사용법
+│   ├── src/main/java/com/example/vault/ # Java 소스 코드
+│   │   ├── VaultApplication.java        # 메인 애플리케이션
+│   │   ├── client/VaultClient.java      # Vault 클라이언트
+│   │   └── config/VaultConfig.java      # 설정 관리
+│   ├── src/main/resources/             # 리소스 파일
+│   │   ├── config.properties            # 설정 파일
+│   │   └── logback.xml                  # 로깅 설정
+│   └── pom.xml                          # Maven 설정
+└── script-sample/                      # Vault Proxy 연계 스크립트 예제
+    ├── README.md                       # 스크립트 사용법 가이드
+    ├── get_kv_secret_proxy.sh          # KV 시크릿 조회 (Proxy)
+    ├── get_db_dynamic_secret_proxy.sh   # Database Dynamic 시크릿 조회 (Proxy)
+    ├── get_db_static_secret_proxy.sh   # Database Static 시크릿 조회 (Proxy)
+    ├── get_aws_userpass.sh             # AWS 자격증명 조회 (Userpass)
+    ├── get_aws_oidc.sh                 # AWS 자격증명 조회 (OIDC)
+    └── vault-proxy-demo/               # Vault Proxy 데모 환경
+        ├── README.md                   # Vault Proxy 사용법
+        ├── vault-proxy.hcl             # Vault Proxy 설정 파일
+        ├── setup-token.sh              # Token 파일 생성 스크립트
+        ├── start-proxy.sh              # Proxy 실행 스크립트
+        └── stop-proxy.sh               # Proxy 중지 스크립트
 ```
 
 ## 📚 문서 가이드
@@ -210,6 +223,8 @@ Development-Guide/
 ```
 
 ### 2. 예제 실행
+
+#### 프로그래밍 언어 예제
 ```bash
 # C언어 예제
 cd c-app
@@ -227,4 +242,22 @@ make
 cd pure-java-app
 mvn clean package
 java -jar target/vault-java-app.jar
+```
+
+#### 스크립트 예제 (Vault Proxy 연계)
+```bash
+# Vault Proxy 설정 및 실행
+cd script-sample/vault-proxy-demo
+./setup-token.sh
+./start-proxy.sh
+
+# 상위 디렉토리로 이동하여 스크립트 실행
+cd ..
+./get_kv_secret_proxy.sh
+./get_db_dynamic_secret_proxy.sh
+./get_db_static_secret_proxy.sh
+
+# Vault Proxy 중지
+cd vault-proxy-demo
+./stop-proxy.sh
 ```
