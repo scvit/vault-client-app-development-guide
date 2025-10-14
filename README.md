@@ -4,6 +4,27 @@
 
 이 가이드는 Vault를 활용하여 애플리케이션에서 시크릿을 안전하게 관리하는 방법을 다룹니다. 개발자들이 Vault API를 직접 연계하여 시크릿을 동적으로 가져오고, 자동 갱신하는 방법을 개발하기 위한 예시를 제공합니다.
 
+### 주요 시나리오
+- **AppRole 인증**: Role ID + Secret ID를 통한 안전한 Vault 접근
+- **자동 시크릿 주입**: Spring Cloud Vault Config를 통한 자동 시크릿 관리
+- **자동 Token Renewal**: Spring Cloud Vault가 Token 갱신을 자동으로 처리
+- **웹 UI 제공**: Thymeleaf를 통한 시크릿 정보 시각화
+- **실시간 갱신**: @RefreshScope를 통한 시크릿 자동 갱신
+- **Database 연동**: Vault Dynamic Secret으로 Database 연결 및 통계 정보 조회
+
+### 필수 동작 요구사항
+
+- C, C++, Java, Python, Spring Boot, Tomcat 예제는 AppRole 인증을 사용합니다.
+- AppRole 인증 후 App은 Vault로부터 Token을 받습니다.
+- Token은 고유 권한이 부여되어 있으며, Web session처럼 만료 시간이 있습니다.
+- Token은 만료되기 전에, 마치 브라우저에서 갱신하거나 특정 동작을 하면 Session 시간이 초기회 되는 것처럼 Token에 대해 Renewal 해야 합니다.
+- Renewal이 실패하면 Vault로의 접근이 불가능합니다.
+
+### Token Renewal 예외 사항
+
+- Spring Boot에서 사용된 Spring Cloud Vault Config는 Token Renewal을 자동으로 처리합니다.
+- Script의 경우 Token Renewal 처리가 어려운 관계로, 이를 대신하는 Vault Proxy를 사용합니다.
+
 ## 🗂️ 디렉토리 구조
 
 ```
