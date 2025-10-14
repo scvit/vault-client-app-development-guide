@@ -97,7 +97,7 @@ deactivate
 📦 KV Secret Data:
 {
   "api_key": "myapp-api-key-123456",
-  "database_url": "postgresql://myapp:securepass@localhost:5432/myappdb"
+  "database_url": "mysql://localhost:3306/mydb"
 }
 
 === Database Dynamic Secret Refresh ===

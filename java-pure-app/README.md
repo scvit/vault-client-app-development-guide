@@ -79,7 +79,7 @@ mvn exec:java -Dexec.mainClass="com.example.vault.VaultApplication"
 === KV Secret Refresh ===
 ✅ KV 시크릿 조회 성공 (버전: 11)
 📦 KV Secret Data (version: 11):
-{"api_key":"myapp-api-key-123456","database_url":"postgresql://myapp:securepass@localhost:5432/myappdb"}
+{"api_key":"myapp-api-key-123456","database_url":"mysql://localhost:3306/mydb"}
 
 === Database Dynamic Secret Refresh ===
 ✅ Database Dynamic 시크릿 조회 성공 (TTL: 60초)

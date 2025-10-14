@@ -144,7 +144,7 @@ Token status: 60 seconds remaining (expires in 1 minutes)
 
 === Fetching Secret ===
 📦 KV Secret Data (version: 10):
-{ "api_key": "myapp-api-key-123456", "database_url": "postgresql://myapp:securepass@localhost:5432/myappdb" }
+{ "api_key": "myapp-api-key-123456", "database_url": "mysql://localhost:3306/mydb" }
 
 🗄️ Database Dynamic Secret (TTL: 59 seconds):
   username: v-approle-db-demo-dy-0x50Hgcj5Mj
