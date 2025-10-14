@@ -186,7 +186,7 @@ enable_kv_secrets() {
     log_info "예시 시크릿 데이터 생성 중..."
     vault kv put my-vault-app-kv/database \
         api_key="myapp-api-key-123456" \
-        database_url="postgresql://myapp:securepass@localhost:5432/myappdb"
+        database_url="mysql://localhost:3306/mydb"
     
     log_success "KV 시크릿 데이터 생성 완료"
 }
@@ -211,12 +211,17 @@ setup_mysql() {
         sleep 10
     fi
     
-    # MySQL 사용자 생성
-    log_info "MySQL 사용자 생성 중..."
-    mysql -u root -ppassword -h 127.0.0.1 -P 3306 --protocol=TCP -e "CREATE USER IF NOT EXISTS 'my-vault-app-static'@'%' IDENTIFIED BY 'password'; GRANT ALL PRIVILEGES ON *.* TO 'my-vault-app-static'@'%';" 2>/dev/null || {
-        log_warning "MySQL 사용자 생성 실패 (MySQL이 아직 시작되지 않았을 수 있습니다)"
+    # MySQL 데이터베이스 및 사용자 생성
+    log_info "MySQL 데이터베이스 및 사용자 생성 중..."
+    mysql -u root -ppassword -h 127.0.0.1 -P 3306 --protocol=TCP -e "
+        CREATE DATABASE IF NOT EXISTS mydb;
+        CREATE USER IF NOT EXISTS 'my-vault-app-static'@'%' IDENTIFIED BY 'password';
+        GRANT ALL PRIVILEGES ON *.* TO 'my-vault-app-static'@'%';
+        FLUSH PRIVILEGES;
+    " 2>/dev/null || {
+        log_warning "MySQL 데이터베이스 및 사용자 생성 실패 (MySQL이 아직 시작되지 않았을 수 있습니다)"
         log_info "수동으로 다음 명령어를 실행하세요:"
-        log_info "mysql -u root -ppassword -h 127.0.0.1 -P 3306 --protocol=TCP -e \"CREATE USER 'my-vault-app-static'@'%' IDENTIFIED BY 'password'; GRANT ALL PRIVILEGES ON *.* TO 'my-vault-app-static'@'%';\""
+        log_info "mysql -u root -ppassword -h 127.0.0.1 -P 3306 --protocol=TCP -e \"CREATE DATABASE IF NOT EXISTS mydb; CREATE USER 'my-vault-app-static'@'%' IDENTIFIED BY 'password'; GRANT ALL PRIVILEGES ON *.* TO 'my-vault-app-static'@'%'; FLUSH PRIVILEGES;\""
     }
     
     log_success "MySQL 설정 완료"
@@ -385,8 +390,13 @@ main() {
     echo ""
     echo "다음 단계:"
     echo "1. config.ini 파일 업데이트 (위의 안내 명령어 실행)"
-    echo "2. C 애플리케이션 빌드: cd c-app && make"
-    echo "3. C 애플리케이션 실행: cd c-app && ./vault-app"
+    echo "2. 예제 애플리케이션 실행:"
+    echo "   - C 애플리케이션: cd c-app && make && ./vault-app"
+    echo "   - C++ 애플리케이션: cd cpp-app && mkdir build && cd build && cmake .. && make && ./vault-app"
+    echo "   - Java 애플리케이션: cd java-pure-app && mvn clean package && java -jar target/vault-java-app.jar"
+    echo "   - Python 애플리케이션: cd python-app && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt && python vault_app.py"
+    echo "   - Spring Boot 웹 애플리케이션: cd java-web-springboot-app && ./gradlew bootRun"
+    echo "     (웹 브라우저에서 http://localhost:8080/vault-web 접속)"
     echo ""
     echo "주의사항:"
     echo "- 이 설정은 개발 환경 전용입니다"

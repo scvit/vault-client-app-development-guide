@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: vault-web-app
+  cloud:
+    vault:
+      authentication: TOKEN
+      token: root
+      host: 127.0.0.1
+      port: 8200
+      scheme: http
+      fail-fast: true
+      config:
+        lifecycle:
+          enabled: true
+          min-renewal: 5s
+          expiry-threshold: 10s
+      generic:
+        enabled: false
+      database:
+        enabled: true
+        role: db-demo-dynamic
+        backend: my-vault-app-database
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/mydb

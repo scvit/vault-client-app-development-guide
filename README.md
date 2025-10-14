@@ -55,6 +55,28 @@ Development-Guide/
 │   ├── vault_app.py                    # 메인 애플리케이션
 │   ├── vault_client.py                 # Vault 클라이언트 클래스
 │   └── config_loader.py                # 설정 로더
+├── java-web-springboot-app/           # Spring Boot 웹 애플리케이션 예제
+│   ├── README.md                       # Spring Boot 예제 사용법
+│   ├── build.gradle                    # Gradle 빌드 설정
+│   ├── src/main/java/com/example/vaultweb/ # Spring Boot 소스 코드
+│   │   ├── VaultWebApplication.java     # Spring Boot 메인 애플리케이션
+│   │   ├── config/                      # 설정 클래스들
+│   │   │   ├── VaultConfig.java         # Vault 설정
+│   │   │   └── DatabaseConfig.java      # Database 설정
+│   │   ├── controller/                  # 웹 컨트롤러
+│   │   │   └── HomeController.java      # 메인 컨트롤러
+│   │   ├── service/                     # 비즈니스 로직
+│   │   │   ├── VaultSecretService.java  # Vault 시크릿 서비스
+│   │   │   └── DatabaseService.java     # Database 서비스
+│   │   └── model/                       # 데이터 모델
+│   │       └── SecretInfo.java          # 시크릿 정보 모델
+│   ├── src/main/resources/             # 리소스 파일
+│   │   ├── application.yml              # Spring Boot 설정
+│   │   ├── bootstrap.yml                # Vault 부트스트랩 설정
+│   │   ├── logback-spring.xml           # 로깅 설정
+│   │   └── templates/                   # Thymeleaf 템플릿
+│   │       └── index.html               # 메인 웹 페이지
+│   └── src/test/java/                  # 테스트 코드
 └── script-sample/                      # Vault Proxy 연계 스크립트 예제
     ├── README.md                       # 스크립트 사용법 가이드
     ├── get_kv_secret_proxy.sh          # KV 시크릿 조회 (Proxy)
@@ -126,6 +148,18 @@ Development-Guide/
   - 실시간 TTL 계산, 멀티스레드 갱신
 - **설치**: `pip install -r requirements.txt`
 - **실행**: `python vault_app.py`
+
+### Spring Boot 웹 예제 ([java-web-springboot-app/](./java-web-springboot-app/))
+- **언어**: Java 11+ (Spring Boot + Spring Cloud Vault Config)
+- **특징**:
+  - Spring Cloud Vault Config를 통한 Database Dynamic Secret 자동 주입
+  - Thymeleaf를 통한 웹 UI 제공
+  - @RefreshScope를 통한 실시간 시크릿 갱신
+  - Vault API 직접 호출로 KV, Static Secret 조회
+  - MySQL 연동 및 Database 통계 정보 표시
+- **빌드**: `./gradlew build`
+- **실행**: `./gradlew bootRun`
+- **웹 접속**: `http://localhost:8080/vault-web`
 
 ## 🔌 Vault API 종류 및 용도
 
@@ -266,6 +300,11 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python vault_app.py
+
+# Spring Boot 웹 예제
+cd java-web-springboot-app
+./gradlew bootRun
+# 웹 브라우저에서 http://localhost:8080/vault-web 접속
 ```
 
 #### 스크립트 예제 (Vault Proxy 연계)
