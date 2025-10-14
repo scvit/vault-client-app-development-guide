@@ -38,7 +38,7 @@ Development-Guide/
 │   │   └── VaultClient.cpp             # Vault 클라이언트 구현
 │   └── third_party/                    # 서드파티 라이브러리
 │       └── json.hpp                    # nlohmann/json 헤더
-├── pure-java-app/                      # Java Vault 클라이언트 예제
+├── java-pure-app/                      # Java Vault 클라이언트 예제
 │   ├── README.md                       # Java 예제 사용법
 │   ├── src/main/java/com/example/vault/ # Java 소스 코드
 │   │   ├── VaultApplication.java        # 메인 애플리케이션
@@ -48,6 +48,13 @@ Development-Guide/
 │   │   ├── config.properties            # 설정 파일
 │   │   └── logback.xml                  # 로깅 설정
 │   └── pom.xml                          # Maven 설정
+├── python-app/                         # Python Vault 클라이언트 예제
+│   ├── README.md                       # Python 예제 사용법
+│   ├── requirements.txt                # Python 패키지 의존성
+│   ├── config.ini                      # 설정 파일
+│   ├── vault_app.py                    # 메인 애플리케이션
+│   ├── vault_client.py                 # Vault 클라이언트 클래스
+│   └── config_loader.py                # 설정 로더
 └── script-sample/                      # Vault Proxy 연계 스크립트 예제
     ├── README.md                       # 스크립트 사용법 가이드
     ├── get_kv_secret_proxy.sh          # KV 시크릿 조회 (Proxy)
@@ -101,7 +108,7 @@ Development-Guide/
 - **빌드**: `mkdir build && cd build && cmake .. && make`
 - **실행**: `./vault-app`
 
-### Java 예제 ([pure-java-app/](./pure-java-app/))
+### Java 예제 ([java-pure-app/](./java-pure-app/))
 - **언어**: Java 11+ (Apache HttpClient + Jackson)
 - **특징**:
   - Maven 기반 프로젝트 구조
@@ -109,6 +116,16 @@ Development-Guide/
   - 시스템 프로퍼티 오버라이드 지원
 - **빌드**: `mvn clean package`
 - **실행**: `java -jar target/vault-java-app.jar`
+
+### Python 예제 ([python-app/](./python-app/))
+- **언어**: Python 3.7+ (hvac + threading)
+- **특징**:
+  - hvac 2.3.0 Vault 전용 라이브러리 사용
+  - 가상환경 기반 패키지 관리
+  - 환경변수 오버라이드 지원
+  - 실시간 TTL 계산, 멀티스레드 갱신
+- **설치**: `pip install -r requirements.txt`
+- **실행**: `python vault_app.py`
 
 ## 🔌 Vault API 종류 및 용도
 
@@ -239,9 +256,16 @@ make
 ./vault-app
 
 # Java 예제
-cd pure-java-app
+cd java-pure-app
 mvn clean package
 java -jar target/vault-java-app.jar
+
+# Python 예제
+cd python-app
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python vault_app.py
 ```
 
 #### 스크립트 예제 (Vault Proxy 연계)
