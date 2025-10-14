@@ -77,6 +77,40 @@ Development-Guide/
 │   │   └── templates/                   # Thymeleaf 템플릿
 │   │       └── index.html               # 메인 웹 페이지
 │   └── src/test/java/                  # 테스트 코드
+├── java-web-tomcat-app/               # Tomcat 웹 애플리케이션 예제
+│   ├── README.md                       # Tomcat 예제 사용법
+│   ├── pom.xml                         # Maven 빌드 설정
+│   ├── src/main/java/com/example/vaulttomcat/ # Tomcat 소스 코드
+│   │   ├── config/                      # 설정 클래스들
+│   │   │   ├── VaultConfig.java         # Vault 설정
+│   │   │   ├── DatabaseConfig.java      # Database Connection Pool 설정
+│   │   │   └── TokenRenewalScheduler.java # Token 자동 갱신 스케줄러
+│   │   ├── client/                      # Vault API 클라이언트
+│   │   │   └── VaultClient.java         # Vault API 클라이언트
+│   │   ├── service/                     # 비즈니스 로직
+│   │   │   ├── VaultSecretService.java  # Vault 시크릿 서비스
+│   │   │   └── DatabaseService.java     # Database 서비스
+│   │   ├── servlet/                     # 웹 서블릿
+│   │   │   ├── HomeServlet.java         # 메인 페이지 서블릿
+│   │   │   └── RefreshServlet.java     # 시크릿 갱신 서블릿
+│   │   ├── listener/                    # 애플리케이션 리스너
+│   │   │   └── AppContextListener.java  # 애플리케이션 초기화 리스너
+│   │   └── model/                       # 데이터 모델
+│   │       └── SecretInfo.java         # 시크릿 정보 모델
+│   ├── src/main/resources/             # 리소스 파일
+│   │   ├── vault.properties             # Vault 설정 파일
+│   │   └── logback.xml                  # 로깅 설정
+│   ├── src/main/webapp/                 # 웹 애플리케이션 리소스
+│   │   ├── WEB-INF/
+│   │   │   ├── web.xml                  # 웹 애플리케이션 배포 설정
+│   │   │   └── jsp/
+│   │   │       └── index.jsp            # 메인 JSP 페이지
+│   │   └── css/
+│   │       └── style.css                # 스타일시트
+│   └── tomcat/                          # Tomcat 10 실행 환경
+│       ├── bin/                         # Tomcat 실행 스크립트
+│       ├── webapps/                     # WAR 배포 디렉토리
+│       └── logs/                        # 로그 파일들
 └── script-sample/                      # Vault Proxy 연계 스크립트 예제
     ├── README.md                       # 스크립트 사용법 가이드
     ├── get_kv_secret_proxy.sh          # KV 시크릿 조회 (Proxy)
@@ -160,6 +194,19 @@ Development-Guide/
 - **빌드**: `./gradlew build`
 - **실행**: `./gradlew bootRun`
 - **웹 접속**: `http://localhost:8080/vault-web`
+
+### Tomcat 웹 예제 ([java-web-tomcat-app/](./java-web-tomcat-app/))
+- **언어**: Java 11+ (Servlet + JSP + Apache Commons DBCP2)
+- **특징**:
+  - 전통적인 Java Web Application (Servlet + JSP)
+  - AppRole 인증을 통한 Vault 접근
+  - Token Auto-Renewal (10초 간격 체크, TTL 80% 지점에서 갱신)
+  - Apache Commons DBCP2 Connection Pool 자동 갱신
+  - JSP + JSTL을 통한 웹 UI 제공
+  - MySQL 연동 및 Database 통계 정보 표시
+- **빌드**: `mvn clean package`
+- **실행**: Tomcat 10에 WAR 배포
+- **웹 접속**: `http://localhost:8080/vault-tomcat-app`
 
 ## 🔌 Vault API 종류 및 용도
 
@@ -305,6 +352,13 @@ python vault_app.py
 cd java-web-springboot-app
 ./gradlew bootRun
 # 웹 브라우저에서 http://localhost:8080/vault-web 접속
+
+# Tomcat 웹 예제
+cd java-web-tomcat-app
+mvn clean package
+cp target/vault-tomcat-app.war tomcat/webapps/
+cd tomcat && bin/catalina.sh start
+# 웹 브라우저에서 http://localhost:8080/vault-tomcat-app 접속
 ```
 
 #### 스크립트 예제 (Vault Proxy 연계)
