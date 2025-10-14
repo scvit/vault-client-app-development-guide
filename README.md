@@ -186,6 +186,8 @@ Development-Guide/
 ### Spring Boot 웹 예제 ([java-web-springboot-app/](./java-web-springboot-app/))
 - **언어**: Java 11+ (Spring Boot + Spring Cloud Vault Config)
 - **특징**:
+  - AppRole 인증을 통한 Vault 접근
+  - Spring Cloud Vault의 자동 Token Renewal
   - Spring Cloud Vault Config를 통한 Database Dynamic Secret 자동 주입
   - Thymeleaf를 통한 웹 UI 제공
   - @RefreshScope를 통한 실시간 시크릿 갱신
