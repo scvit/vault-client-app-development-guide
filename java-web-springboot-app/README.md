@@ -21,6 +21,12 @@ Spring Boot에서 `datasource` 설정으로 Database 연결을 관리합니다. 
 - **Database Dynamic**: 동적 데이터베이스 자격증명 (DataSource 자동 구성)
 - **Database Static**: 정적 데이터베이스 자격증명 (Vault API 직접 호출)
 
+### 🎛️ Database 자격증명 소스 선택
+애플리케이션은 Database 접속을 위해 다음 3가지 자격증명 소스 중 하나를 선택할 수 있습니다:
+- **KV Secret**: 정적 자격증명 (KV Secret에서 Database 자격증명 조회)
+- **Database Dynamic Secret**: 동적 자격증명 (TTL 기반 자동 갱신)
+- **Database Static Secret**: 정적 관리 자격증명 (Vault에서 자동 rotate)
+
 ### 💡 개발 고려사항
 - **Spring Cloud Vault Config**: Database Dynamic Secret만 자동 주입
 - **@RefreshScope**: Database 연결 시 최신 Dynamic Secret 사용
@@ -123,6 +129,49 @@ spring:
         username-property: spring.datasource.username
         password-property: spring.datasource.password
 ```
+
+### Database 자격증명 소스 선택 (application.yml)
+```yaml
+vault:
+  database:
+    credential-source: kv  # kv, dynamic, static 중 선택
+    kv:
+      path: my-vault-app-kv/data/database
+      username-key: database_username
+      password-key: database_password
+    dynamic:
+      role: db-demo-dynamic
+    static:
+      role: db-demo-static
+```
+
+#### 1. KV Secret (정적 자격증명)
+```yaml
+vault:
+  database:
+    credential-source: kv
+```
+- KV Secret에서 Database 자격증명 조회
+- `database_username`, `database_password` 키 사용
+- **주의**: KV Secret의 자격증명이 변경되면 애플리케이션 재시작 필요
+
+#### 2. Database Dynamic Secret (동적 자격증명)
+```yaml
+vault:
+  database:
+    credential-source: dynamic
+```
+- TTL 기반 자동 갱신
+- Spring Cloud Vault Config 자동 주입 활용
+
+#### 3. Database Static Secret (정적 관리 자격증명)
+```yaml
+vault:
+  database:
+    credential-source: static
+```
+- Vault에서 자동으로 rotate
+- User는 유지되므로 애플리케이션에서는 주기적 갱신 불필요
 
 ### 애플리케이션 설정 (application.yml)
 ```yaml
@@ -244,6 +293,33 @@ src/main/java/com/example/vaultweb/
 4. **Database 연결 실패**: MySQL 설정 및 Vault Dynamic Secret 확인
 5. **Thymeleaf 렌더링 실패**: Thymeleaf 의존성 및 설정 확인
 6. **KV/Static Secret 조회 실패**: VaultTemplate 설정 및 Vault API 권한 확인
+7. **자격증명 소스 설정 미적용**: application.yml 수정 후 애플리케이션 재시작 필요
+8. **Database 자격증명 소스 변경 실패**: Vault API 권한 및 네트워크 연결 확인
+
+### 자격증명 소스 변경 시 주의사항
+
+자격증명 소스(`kv`, `dynamic`, `static`)를 변경한 후에는 다음 단계를 수행해야 합니다:
+
+```bash
+# 1. 애플리케이션 정지
+# Ctrl+C 또는 프로세스 종료
+
+# 2. application.yml 수정
+# vault.database.credential-source 값을 원하는 소스로 변경
+
+# 3. 애플리케이션 재시작
+./gradlew bootRun
+```
+
+**중요**: 설정 변경 후 애플리케이션을 재시작해야 새로운 자격증명 소스가 적용됩니다. @RefreshScope는 설정 변경을 감지하지만, Database 연결은 초기화 시점에 결정되므로 재시작이 필요합니다.
+
+### 테스트된 자격증명 소스
+
+✅ **KV Secret**: `my-vault-app-kv/data/database`에서 `database_username`, `database_password` 조회 성공  
+✅ **Database Dynamic Secret**: `my-vault-app-database/creds/db-demo-dynamic`에서 동적 자격증명 조회 성공  
+✅ **Database Static Secret**: `my-vault-app-database/static-creds/db-demo-static`에서 정적 자격증명 조회 성공
+
+모든 자격증명 소스가 정상적으로 동작하며, 설정 변경 시 로그에서 사용 중인 자격증명 소스를 확인할 수 있습니다.
 
 ## 📚 참고 자료
 

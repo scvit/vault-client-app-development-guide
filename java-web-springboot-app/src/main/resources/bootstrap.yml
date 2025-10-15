@@ -5,8 +5,8 @@ spring:
     vault:
       authentication: APPROLE
       app-role:
-        role-id: 4060cafc-6cda-3bb4-a690-63177f9a5bc6
-        secret-id: 6f42ffc4-1627-0b60-7ed5-643b02ec4e99
+        role-id: ec993268-3045-0145-f847-5145e5be9fba
+        secret-id: e42e1b3e-1643-2916-2193-89cc312cd750
       host: 127.0.0.1
       port: 8200
       scheme: http

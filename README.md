@@ -217,6 +217,7 @@ Development-Guide/
   - @RefreshScope를 통한 실시간 시크릿 갱신
   - Vault API 직접 호출로 KV, Static Secret 조회
   - MySQL 연동 및 Database 통계 정보 표시
+  - **자격증명 소스 선택**: KV, Dynamic, Static 중 선택 가능 (테스트 완료)
 - **빌드**: `./gradlew build`
 - **실행**: `./gradlew bootRun`
 - **웹 접속**: `http://localhost:8080/vault-web`

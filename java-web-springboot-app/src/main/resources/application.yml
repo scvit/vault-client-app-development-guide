@@ -3,6 +3,18 @@ server:
   servlet:
     context-path: /vault-web
 
+vault:
+  database:
+    credential-source: kv  # kv, dynamic, static 중 선택
+    kv:
+      path: my-vault-app-kv/data/database
+      username-key: database_username
+      password-key: database_password
+    dynamic:
+      role: db-demo-dynamic
+    static:
+      role: db-demo-static
+
 spring:
   thymeleaf:
     prefix: classpath:/templates/

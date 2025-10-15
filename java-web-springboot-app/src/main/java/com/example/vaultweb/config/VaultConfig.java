@@ -178,6 +178,10 @@ public class VaultConfig {
     private String role;
     private String usernameProperty;
     private String passwordProperty;
+    private String credentialSource = "dynamic";
+    private Kv kv;
+    private Dynamic dynamic;
+    private Static staticCreds;
 
     // Getters and Setters
     public boolean isEnabled() {
@@ -218,6 +222,93 @@ public class VaultConfig {
 
     public void setPasswordProperty(String passwordProperty) {
       this.passwordProperty = passwordProperty;
+    }
+
+    public String getCredentialSource() {
+      return credentialSource;
+    }
+
+    public void setCredentialSource(String credentialSource) {
+      this.credentialSource = credentialSource;
+    }
+
+    public Kv getKv() {
+      return kv;
+    }
+
+    public void setKv(Kv kv) {
+      this.kv = kv;
+    }
+
+    public Dynamic getDynamic() {
+      return dynamic;
+    }
+
+    public void setDynamic(Dynamic dynamic) {
+      this.dynamic = dynamic;
+    }
+
+    public Static getStaticCreds() {
+      return staticCreds;
+    }
+
+    public void setStaticCreds(Static staticCreds) {
+      this.staticCreds = staticCreds;
+    }
+
+    // Inner Classes
+    public static class Kv {
+      private String path;
+      private String usernameKey;
+      private String passwordKey;
+
+      public String getPath() {
+        return path;
+      }
+
+      public void setPath(String path) {
+        this.path = path;
+      }
+
+      public String getUsernameKey() {
+        return usernameKey;
+      }
+
+      public void setUsernameKey(String usernameKey) {
+        this.usernameKey = usernameKey;
+      }
+
+      public String getPasswordKey() {
+        return passwordKey;
+      }
+
+      public void setPasswordKey(String passwordKey) {
+        this.passwordKey = passwordKey;
+      }
+    }
+
+    public static class Dynamic {
+      private String role;
+
+      public String getRole() {
+        return role;
+      }
+
+      public void setRole(String role) {
+        this.role = role;
+      }
+    }
+
+    public static class Static {
+      private String role;
+
+      public String getRole() {
+        return role;
+      }
+
+      public void setRole(String role) {
+        this.role = role;
+      }
     }
   }
 

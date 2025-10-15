@@ -1,5 +1,7 @@
 package com.example.vaultweb.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -22,8 +24,13 @@ import com.example.vaultweb.service.VaultSecretService;
 @ConfigurationProperties(prefix = "spring.datasource")
 public class DatabaseConfig {
 
+  private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
+
   @Autowired
   private VaultSecretService vaultSecretService;
+
+  @Autowired
+  private VaultConfig vaultConfig;
 
   private String url;
   private String driverClassName;
@@ -34,43 +41,73 @@ public class DatabaseConfig {
   @Bean
   @RefreshScope
   public DataSource dataSource() {
-    System.out.println("=== DatabaseConfig Debug ===");
-    System.out.println("URL: " + this.url);
-    System.out.println("Driver: " + this.driverClassName);
-    System.out.println("Username: " + this.username);
-    System.out.println("Password: " + (this.password != null ? "***" : "NULL"));
-    System.out.println("=============================");
+    logger.info("=== DatabaseConfig Debug ===");
+    logger.info("URL: {}", this.url);
+    logger.info("Driver: {}", this.driverClassName);
+    logger.info("Username: {}", this.username);
+    logger.info("Password: {}", (this.password != null ? "***" : "NULL"));
 
     // driverClassName이 null인 경우 기본값 설정
     if (this.driverClassName == null) {
       this.driverClassName = "com.mysql.cj.jdbc.Driver";
-      System.out.println("Setting default driver: " + this.driverClassName);
+      logger.info("Setting default driver: {}", this.driverClassName);
     }
 
     // URL이 null인 경우 기본값 설정
     if (this.url == null) {
       this.url = "jdbc:mysql://127.0.0.1:3306/mydb";
-      System.out.println("Setting default URL: " + this.url);
+      logger.info("Setting default URL: {}", this.url);
     }
 
-    // Vault에서 동적 데이터베이스 자격 증명 가져오기 (매번 최신 credential 조회)
+    // Vault 설정에서 자격증명 소스 확인
+    String credentialSource = vaultConfig.getDatabase() != null
+        ? vaultConfig.getDatabase().getCredentialSource()
+        : "dynamic";
+
+    logger.info("=== Database 자격증명 소스: {} ===", credentialSource);
+
     String finalUsername = this.username;
     String finalPassword = this.password;
 
     try {
-      var dbCredentials = vaultSecretService.getDatabaseCredentials("db-demo-dynamic");
-      if (dbCredentials != null && dbCredentials.getData() != null) {
-        String vaultUsername = (String) dbCredentials.getData().get("username");
-        String vaultPassword = (String) dbCredentials.getData().get("password");
+      switch (credentialSource.toLowerCase()) {
+        case "kv":
+          // KV Secret에서 자격증명 조회
+          var kvSecret = vaultSecretService.getKvSecret();
+          if (kvSecret != null && kvSecret.getData() != null) {
+            finalUsername = (String) kvSecret.getData().get("database_username");
+            finalPassword = (String) kvSecret.getData().get("database_password");
+            logger.info("✅ KV Secret 자격증명 사용: {}", finalUsername);
+          }
+          break;
 
-        if (vaultUsername != null && vaultPassword != null) {
-          System.out.println("Using Vault credentials: " + vaultUsername);
-          finalUsername = vaultUsername;
-          finalPassword = vaultPassword;
-        }
+        case "static":
+          // Database Static Secret에서 자격증명 조회
+          var staticSecret = vaultSecretService.getDatabaseStaticSecret();
+          if (staticSecret != null && staticSecret.getData() != null) {
+            finalUsername = (String) staticSecret.getData().get("username");
+            finalPassword = (String) staticSecret.getData().get("password");
+            logger.info("✅ Static Secret 자격증명 사용: {}", finalUsername);
+          }
+          break;
+
+        case "dynamic":
+        default:
+          // Database Dynamic Secret에서 자격증명 조회
+          String role = vaultConfig.getDatabase() != null
+              && vaultConfig.getDatabase().getDynamic() != null
+                  ? vaultConfig.getDatabase().getDynamic().getRole()
+                  : "db-demo-dynamic";
+          var dynamicSecret = vaultSecretService.getDatabaseCredentials(role);
+          if (dynamicSecret != null && dynamicSecret.getData() != null) {
+            finalUsername = (String) dynamicSecret.getData().get("username");
+            finalPassword = (String) dynamicSecret.getData().get("password");
+            logger.info("✅ Dynamic Secret 자격증명 사용: {}", finalUsername);
+          }
+          break;
       }
     } catch (Exception e) {
-      System.out.println("Failed to get Vault credentials, using default: " + e.getMessage());
+      logger.error("❌ Vault 자격증명 조회 실패, 기본값 사용: {}", e.getMessage());
     }
 
     HikariConfig config = new HikariConfig();

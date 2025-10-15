@@ -1,8 +1,10 @@
 package com.example.vaultweb.service;
 
 import com.example.vaultweb.model.SecretInfo;
+import com.example.vaultweb.config.VaultConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,9 @@ public class VaultSecretService {
   private static final Logger logger = LoggerFactory.getLogger(VaultSecretService.class);
 
   private final VaultTemplate vaultTemplate;
+
+  @Autowired
+  private VaultConfig vaultConfig;
 
   // KV 시크릿 (Spring Cloud Vault Config에서 자동 주입)
   @Value("${vault.kv.api_key:}")
@@ -198,9 +203,30 @@ public class VaultSecretService {
   public Map<String, SecretInfo> getAllSecrets() {
     Map<String, SecretInfo> secrets = new HashMap<>();
 
+    // 자격증명 소스 확인
+    String credentialSource = vaultConfig.getDatabase() != null
+        ? vaultConfig.getDatabase().getCredentialSource()
+        : "dynamic";
+
+    logger.info("🔍 현재 자격증명 소스: {}", credentialSource);
+
+    // KV Secret은 항상 조회 (Database 자격증명과 별개)
     secrets.put("kv", getKvSecret());
-    secrets.put("database_dynamic", getDatabaseDynamicSecret());
-    secrets.put("database_static", getDatabaseStaticSecret());
+
+    // Database 자격증명은 설정된 소스에 따라 조회
+    switch (credentialSource.toLowerCase()) {
+      case "kv":
+        // KV Secret에서 Database 자격증명 사용 (별도 표시 안 함)
+        logger.info("📦 Database 자격증명: KV Secret 사용");
+        break;
+      case "static":
+        secrets.put("database_static", getDatabaseStaticSecret());
+        break;
+      case "dynamic":
+      default:
+        secrets.put("database_dynamic", getDatabaseDynamicSecret());
+        break;
+    }
 
     return secrets;
   }
