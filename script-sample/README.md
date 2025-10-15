@@ -21,21 +21,38 @@
 - **경로**: `my-vault-app-database/static-creds/db-demo-static`
 - **출력**: 고정 사용자명, 비밀번호, TTL 정보
 
+#### 4. `get_ssh_kv_proxy.sh` - SSH KV 자격증명 조회 (Proxy)
+- **용도**: Vault Proxy를 통한 KV 기반 SSH 자격증명 조회 및 연결
+- **경로**: `my-vault-app-kv/ssh/<호스트IP>`
+- **출력**: SSH 자격증명 정보, 자동 연결 (sshpass 사용)
+- **인자**: 호스트IP (선택사항, 기본값: 10.10.0.222)
+
+#### 5. `get_ssh_otp_proxy.sh` - SSH OTP 생성 (Proxy)
+- **용도**: Vault Proxy를 통한 SSH OTP 생성 및 수동 연결 안내
+- **경로**: `my-vault-app-ssh-otp/creds/otp-role`
+- **출력**: 일회용 OTP 키, 사용자명, 호스트 정보, SSH 연결 명령어
+
+#### 6. `get_ssh_signed_cert_proxy.sh` - SSH Signed Certificate 생성 (Proxy)
+- **용도**: Vault Proxy를 통한 SSH Signed Certificate 생성 및 저장
+- **경로**: `my-vault-app-ssh-ca/sign/client-signer`
+- **출력**: 서명된 SSH 인증서, 시리얼 번호, SSH 연결 명령어
+- **사전 요구사항**: SSH 서버에 CA Public Key 등록 필요
+
 ### AWS 자격증명 조회 스크립트
 
-#### 4. `get_aws_userpass.sh` - AWS 자격증명 조회
+#### 7. `get_aws_userpass.sh` - AWS 자격증명 조회
 - **용도**: AWS 자격증명 조회 및 credentials 파일 업데이트
 - **인증**: Userpass 방식
 - **출력**: AWS Access Key, Secret Key, Session Token
 
-#### 5. `get_aws_oidc.sh` - AWS 자격증명 조회
+#### 8. `get_aws_oidc.sh` - AWS 자격증명 조회
 - **용도**: AWS 자격증명 조회 및 credentials 파일 업데이트
 - **인증**: OIDC 방식
 - **출력**: AWS Access Key, Secret Key, Session Token
 
 ### Vault Proxy 데모 환경
 
-#### 6. `vault-proxy-demo/` - Vault Proxy 데모 환경
+#### 9. `vault-proxy-demo/` - Vault Proxy 데모 환경
 - **용도**: Vault Proxy 실행 및 관리
 - **포함**: 설정 파일, 실행/중지 스크립트, 사용법
 - **특징**: Root token 사용, 포트 8400
@@ -74,6 +91,17 @@ cd ..
 
 # Database Static 시크릿 조회
 ./get_db_static_secret_proxy.sh
+
+# SSH KV 자격증명 조회 및 연결
+./get_ssh_kv_proxy.sh                    # 기본 호스트 사용
+./get_ssh_kv_proxy.sh 192.168.0.47       # 특정 호스트 지정
+
+# SSH OTP 생성 (수동 연결)
+./get_ssh_otp_proxy.sh
+
+# SSH Signed Certificate 생성
+./get_ssh_signed_cert_proxy.sh
+
 ```
 
 #### Vault Proxy 중지
@@ -159,3 +187,105 @@ brew install jq
 
 ### 권한 오류
 Vault Proxy가 해당 시크릿에 접근할 수 있는 권한이 있는지 확인하세요.
+
+### SSH 연결 실패
+```bash
+# SSH 서버 설정 확인
+ssh -v user@host  # 상세 로그로 연결 과정 확인
+
+# SSH 서버에서 패스워드 인증 활성화
+sudo vim /etc/ssh/sshd_config
+# PasswordAuthentication yes 추가
+sudo systemctl restart sshd
+
+# Vault SSH Helper 설치 확인
+vault ssh -help
+```
+
+## SSH 설정 주의사항
+
+### SSH OTP
+- OTP는 일회용이며 단 한 번만 사용 가능
+- 타겟 SSH 서버에 Vault SSH Helper가 설치되어 있어야 함
+- SSH 서버에서 패스워드 인증이 활성화되어 있어야 함
+- CIDR 제한으로 보안 강화 가능
+- 스크립트 실행 전 `SSH_USERNAME`과 `SSH_HOST` 설정 필요
+- **수동 연결**: 스크립트에서 제공하는 SSH 명령어와 패스워드를 수동으로 입력
+
+#### SSH 서버 설정 요구사항
+```bash
+# SSH 서버에서 패스워드 인증 활성화
+sudo vim /etc/ssh/sshd_config
+# 다음 설정 추가/수정:
+PasswordAuthentication yes
+PubkeyAuthentication yes
+ChallengeResponseAuthentication yes
+UsePAM yes
+
+# SSH 서비스 재시작
+sudo systemctl restart sshd
+
+# Vault SSH Helper 설치 (SSH 서버에서)
+vault ssh -help  # Vault CLI가 설치되어 있어야 함
+```
+
+### SSH Signed Certificate
+- 타겟 SSH 서버에 CA Public Key가 등록되어 있어야 함
+- Certificate TTL은 20초 (SSH CA Role 설정에 따라 제한됨)
+- 기존 SSH 키를 재사용 가능
+- 스크립트 실행 전 `SSH_USERNAME` 설정 필요
+- SSH 키가 없는 경우 `ssh-keygen -t rsa -C "test@rocky" -f ~/.ssh/vault_rsa` 실행
+
+### SSH KV 자격증명
+- KV에 저장된 정적 자격증명 사용
+- sshpass 설치 권장 (자동 연결)
+- 초기 적용 단계에서 사용, 이후 SSH OTP/Signed Certificate로 전환 권장
+
+#### SSH 서버 사전 설정 (한 번만 수행)
+```bash
+# SSH 서버에서 CA Public Key 등록
+vault read -field=public_key my-vault-app-ssh-ca/config/ca | sudo tee /etc/ssh/trusted-user-ca-keys.pem
+echo 'TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem' | sudo tee -a /etc/ssh/sshd_config
+sudo systemctl restart sshd
+```
+
+## SSH 자동 연결 대안 방법 (고급 사용자용)
+
+### sshpass 사용 (권장)
+```bash
+# sshpass 설치
+# Ubuntu/Debian: sudo apt-get install sshpass
+# CentOS/RHEL: sudo yum install sshpass
+# macOS: brew install sshpass
+
+# 사용법
+sshpass -p "password" ssh user@host
+```
+
+### expect 사용
+```bash
+# expect 설치
+# Ubuntu/Debian: sudo apt-get install expect
+# CentOS/RHEL: sudo yum install expect
+# macOS: brew install expect
+
+# expect 스크립트 예제
+expect << EOF
+spawn ssh user@host
+expect "password:"
+send "password\r"
+interact
+EOF
+```
+
+**참고**: 예제 스크립트는 수동 연결을 기본으로 하며, 자동 연결이 필요한 경우 위의 방법을 사용할 수 있습니다.
+
+### SSH 연결 방법 비교
+
+| 방법 | 장점 | 단점 | 의존성 |
+|------|------|------|--------|
+| **수동 연결** | 의존성 없음, 안전함 | 사용자 개입 필요 | 없음 |
+| **sshpass** | 간단하고 안정적 | 별도 설치 필요 | sshpass |
+| **expect** | 대화형 세션 완벽 지원 | 복잡한 스크립트 | expect |
+
+**권장**: 기본적으로 수동 연결을 사용하고, 자동화가 필요한 경우 `sshpass`를 사용하세요.

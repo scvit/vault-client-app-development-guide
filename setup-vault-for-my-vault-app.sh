@@ -113,6 +113,16 @@ path "sys/leases/lookup" {
 path "sys/leases/renew" {
   capabilities = ["update"]
 }
+
+# SSH OTP 권한
+path "{{identity.entity.name}}-ssh-otp/creds/*" {
+  capabilities = ["read", "create", "update"]
+}
+
+# SSH CA 권한
+path "{{identity.entity.name}}-ssh-ca/sign/*" {
+  capabilities = ["read", "create", "update"]
+}
 EOF
     
     log_success "정책 생성 완료"
@@ -184,9 +194,21 @@ enable_kv_secrets() {
     
     # 예시 시크릿 데이터 생성
     log_info "예시 시크릿 데이터 생성 중..."
+
     vault kv put my-vault-app-kv/database \
         api_key="myapp-api-key-123456" \
-        database_url="mysql://localhost:3306/mydb"
+        database_url="mysql://localhost:3306/mydb" \
+        database_username="root" \
+        database_password="password"
+
+    vault kv put my-vault-app-kv/ssh/10.10.0.222 \
+        ssh_username="test" \
+        ssh_password="password"
+    
+    # 추가 SSH 호스트 예제
+    vault kv put my-vault-app-kv/ssh/192.168.0.47 \
+        ssh_username="vault-test" \
+        ssh_password="test-password"
     
     log_success "KV 시크릿 데이터 생성 완료"
 }
@@ -199,8 +221,10 @@ setup_mysql() {
     if docker ps -a | grep -q "my-vault-app-mysql"; then
         log_warning "MySQL 컨테이너가 이미 존재합니다."
         if ! docker ps | grep -q "my-vault-app-mysql"; then
-            log_info "MySQL 컨테이너 시작 중..."
             docker start my-vault-app-mysql
+
+            log_info "MySQL 컨테이너 시작 중..."
+            sleep 10
         fi
     else
         log_info "MySQL 컨테이너 생성 중..."
@@ -263,6 +287,63 @@ enable_database_secrets() {
     log_success "Database 시크릿 엔진 설정 완료"
 }
 
+# SSH Secrets Engine 활성화 (OTP)
+enable_ssh_otp() {
+    log_info "SSH OTP Secrets Engine 활성화 중..."
+    
+    if vault secrets list | grep -q "my-vault-app-ssh-otp/"; then
+        log_warning "SSH OTP 엔진이 이미 활성화되어 있습니다."
+    else
+        vault secrets enable -path=my-vault-app-ssh-otp ssh
+        log_success "SSH OTP 엔진 활성화 완료"
+    fi
+    
+    # OTP Role 생성
+    log_info "SSH OTP Role 생성 중..."
+    vault write my-vault-app-ssh-otp/roles/otp-role \
+        key_type=otp \
+        allowed_users=test1,test2 \
+        default_user=test1 \
+        cidr_list=0.0.0.0/0
+    
+    log_success "SSH OTP Role 생성 완료"
+}
+
+# SSH Secrets Engine 활성화 (CA)
+enable_ssh_ca() {
+    log_info "SSH CA Secrets Engine 활성화 중..."
+    
+    if vault secrets list | grep -q "my-vault-app-ssh-ca/"; then
+        log_warning "SSH CA 엔진이 이미 활성화되어 있습니다."
+    else
+        vault secrets enable -path=my-vault-app-ssh-ca ssh
+        log_success "SSH CA 엔진 활성화 완료"
+    fi
+    
+    # CA 키 생성
+    log_info "SSH CA 키 생성 중..."
+    vault delete my-vault-app-ssh-ca/config/ca
+    vault write my-vault-app-ssh-ca/config/ca generate_signing_key=true
+    
+    # Client Signer Role 생성
+    log_info "SSH Client Signer Role 생성 중..."
+    vault write my-vault-app-ssh-ca/roles/client-signer - <<-EOF
+    {
+        "key_type": "ca",
+        "allow_user_certificates": true,
+        "allowed_users": "*",
+        "allowed_extensions": "permit-pty,permit-port-forwarding",
+        "default_extensions": {
+            "permit-pty":""
+        },
+        "ttl": "20s",
+        "max_ttl": "20s"
+    }
+EOF
+    
+    log_success "SSH CA Role 생성 완료"
+}
+
 # 설정 검증
 verify_setup() {
     log_info "설정 검증 중..."
@@ -302,6 +383,18 @@ verify_setup() {
     echo ""
     log_info "=== Database Static Role 테스트 ==="
     vault read my-vault-app-database/static-creds/db-demo-static
+    
+    echo ""
+    log_info "=== SSH OTP Role 확인 ==="
+    vault read my-vault-app-ssh-otp/roles/otp-role
+    
+    echo ""
+    log_info "=== SSH CA Role 확인 ==="
+    vault read my-vault-app-ssh-ca/roles/client-signer
+    
+    echo ""
+    log_info "=== SSH CA Public Key 확인 ==="
+    vault read -field=public_key my-vault-app-ssh-ca/config/ca
     
     log_success "설정 검증 완료"
 }
@@ -374,6 +467,12 @@ main() {
         log_warning "Docker가 설치되지 않았습니다. Database 시크릿 엔진을 건너뜁니다."
     fi
     
+    # 10. SSH OTP 설정
+    enable_ssh_otp
+    
+    # 11. SSH CA 설정
+    enable_ssh_ca
+    
     # 10. 설정 검증
     verify_setup
     
@@ -397,6 +496,11 @@ main() {
     echo "   - Python 애플리케이션: cd python-app && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt && python vault_app.py"
     echo "   - Spring Boot 웹 애플리케이션: cd java-web-springboot-app && ./gradlew bootRun"
     echo "     (웹 브라우저에서 http://localhost:8080/vault-web 접속)"
+    echo ""
+    echo "SSH 설정:"
+    echo "- SSH OTP: script-sample/get_ssh_otp_proxy.sh 참고"
+    echo "- SSH CA: script-sample/get_ssh_signed_cert_proxy.sh 참고"
+    echo "- SSH 타겟 호스트 설정이 필요합니다 (스크립트 내 <호스트> 플레이스홀더 수정)"
     echo ""
     echo "주의사항:"
     echo "- 이 설정은 개발 환경 전용입니다"

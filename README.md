@@ -137,6 +137,9 @@ Development-Guide/
     ├── get_kv_secret_proxy.sh          # KV 시크릿 조회 (Proxy)
     ├── get_db_dynamic_secret_proxy.sh   # Database Dynamic 시크릿 조회 (Proxy)
     ├── get_db_static_secret_proxy.sh   # Database Static 시크릿 조회 (Proxy)
+    ├── get_ssh_otp_proxy.sh            # SSH OTP 생성 (Proxy)
+    ├── get_ssh_signed_cert_proxy.sh    # SSH Signed Certificate 생성 (Proxy)
+    ├── get_ssh_kv_proxy.sh             # SSH KV 자격증명 조회 (Proxy)
     ├── get_aws_userpass.sh             # AWS 자격증명 조회 (Userpass)
     ├── get_aws_oidc.sh                 # AWS 자격증명 조회 (OIDC)
     └── vault-proxy-demo/               # Vault Proxy 데모 환경
@@ -396,8 +399,16 @@ cd ..
 ./get_kv_secret_proxy.sh
 ./get_db_dynamic_secret_proxy.sh
 ./get_db_static_secret_proxy.sh
+./get_ssh_otp_proxy.sh
+./get_ssh_signed_cert_proxy.sh
+./get_ssh_kv_proxy.sh
 
 # Vault Proxy 중지
 cd vault-proxy-demo
 ./stop-proxy.sh
 ```
+
+### 스크립트 예제 (script-sample/)
+- **Bash 스크립트**: Vault API 직접 호출 및 Vault Proxy 연동
+- **지원 시크릿**: KV, Database Dynamic/Static, SSH (KV/OTP/Signed Certificate)
+- **특징**: Vault CLI 불필요, 순수 curl 사용, JSON 파싱 지원
