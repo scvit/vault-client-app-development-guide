@@ -30,28 +30,23 @@ public class DatabaseConfig {
    */
   public static void initialize(VaultSecretService vaultService) {
     vaultSecretService = vaultService;
-    logger.info("=== 🚀 Database Connection Pool 초기화 시작 ===");
+    String credentialSource = VaultConfig.getDatabaseCredentialSource();
+
+    logger.info("=== Database Connection Pool 초기화 (자격증명 소스: {}) ===", credentialSource);
 
     try {
-      // 1. Vault에서 Dynamic Secret 조회
-      logger.info("📡 Vault에서 초기 Database Dynamic Secret 조회 중...");
-      SecretInfo dbSecret = vaultSecretService.getDatabaseDynamicSecret();
-
-      @SuppressWarnings("unchecked")
-      Map<String, Object> data = (Map<String, Object>) dbSecret.getData();
-      String username = (String) data.get("username");
-      logger.info("✅ 초기 Database Secret 조회 완료 - Username: {}", username);
-      logger.info("⏰ 초기 TTL: {}초", dbSecret.getTtl());
-
-      // 2. Connection Pool 생성
-      logger.info("🔧 초기 Database Connection Pool 생성 중...");
-      createDataSource(dbSecret);
-
-      // 3. TTL의 80% 시점에 자격증명 갱신 스케줄링
-      if (dbSecret.getTtl() != null && dbSecret.getTtl() > 0) {
-        long refreshDelay = (long) (dbSecret.getTtl() * 0.8 * 1000); // 80% 시점 (밀리초)
-        logger.info("⏰ 자동 갱신 스케줄링 - {}초 후 (TTL의 80% 시점)", refreshDelay / 1000);
-        scheduleCredentialRefresh(refreshDelay);
+      switch (credentialSource.toLowerCase()) {
+        case "kv":
+          initializeWithKv();
+          break;
+        case "dynamic":
+          initializeWithDynamic();
+          break;
+        case "static":
+          initializeWithStatic();
+          break;
+        default:
+          throw new IllegalArgumentException("지원하지 않는 자격증명 소스: " + credentialSource);
       }
 
       logger.info("🎉 Database Connection Pool 초기화 완료");
@@ -63,28 +58,88 @@ public class DatabaseConfig {
   }
 
   /**
+   * KV 기반 초기화
+   */
+  private static void initializeWithKv() {
+    logger.info("📦 KV 기반 Database 자격증명 초기화");
+
+    // KV에서 자격증명 조회
+    SecretInfo kvSecret = vaultSecretService.getKvSecret();
+    Map<String, Object> data = (Map<String, Object>) kvSecret.getData();
+
+    String username = (String) data.get("database_username");
+    String password = (String) data.get("database_password");
+
+    // Connection Pool 생성
+    createDataSource(username, password, kvSecret);
+
+    // KV 버전 변경 감지 스케줄링
+    int refreshInterval = VaultConfig.getDatabaseKvRefreshInterval();
+    scheduleKvVersionCheck(refreshInterval, kvSecret.getVersion());
+  }
+
+  /**
+   * Dynamic 기반 초기화
+   */
+  private static void initializeWithDynamic() {
+    logger.info("🔄 Database Dynamic Secret 기반 자격증명 초기화");
+
+    // Dynamic Secret 조회
+    SecretInfo dbSecret = vaultSecretService.getDatabaseDynamicSecret();
+    Map<String, Object> data = (Map<String, Object>) dbSecret.getData();
+
+    String username = (String) data.get("username");
+    String password = (String) data.get("password");
+
+    // Connection Pool 생성
+    createDataSource(username, password, dbSecret);
+
+    // TTL 기반 갱신 스케줄링
+    if (dbSecret.getTtl() != null && dbSecret.getTtl() > 0) {
+      long refreshDelay = (long) (dbSecret.getTtl() * 0.8 * 1000);
+      scheduleCredentialRefresh(refreshDelay);
+    }
+  }
+
+  /**
+   * Static 기반 초기화
+   */
+  private static void initializeWithStatic() {
+    logger.info("🔒 Database Static Secret 기반 자격증명 초기화");
+
+    // Static Secret 조회
+    SecretInfo staticSecret = vaultSecretService.getDatabaseStaticSecret();
+    Map<String, Object> data = (Map<String, Object>) staticSecret.getData();
+
+    String username = (String) data.get("username");
+    String password = (String) data.get("password");
+
+    // Connection Pool 생성
+    createDataSource(username, password, staticSecret);
+
+    // Static은 주기적 갱신 불필요 (Vault에서 자동 rotate)
+    logger.info("ℹ️ Static Secret은 Vault에서 자동으로 rotate됩니다");
+  }
+
+  /**
    * Connection Pool 생성
    */
-  private static void createDataSource(SecretInfo dbSecret) {
+  private static void createDataSource(String username, String password, SecretInfo secretInfo) {
     logger.info("🔧 Database Connection Pool 생성 시작...");
 
     dataSource = new BasicDataSource();
 
     // Database 연결 설정
-    String url = "jdbc:mysql://127.0.0.1:3306/mydb";
-    String driverClass = "com.mysql.cj.jdbc.Driver";
+    String url = VaultConfig.getDatabaseUrl();
+    String driverClass = VaultConfig.getDatabaseDriver();
+
     dataSource.setUrl(url);
     dataSource.setDriverClassName(driverClass);
-    logger.info("🗄️ Database URL: {}", url);
-    logger.info("🔌 Database Driver: {}", driverClass);
-
-    // Vault에서 받은 자격증명 설정
-    @SuppressWarnings("unchecked")
-    Map<String, Object> data = (Map<String, Object>) dbSecret.getData();
-    String username = (String) data.get("username");
-    String password = (String) data.get("password");
     dataSource.setUsername(username);
     dataSource.setPassword(password);
+
+    logger.info("🗄️ Database URL: {}", url);
+    logger.info("🔌 Database Driver: {}", driverClass);
     logger.info("🔑 Database 자격증명 설정 - Username: {}, Password: ***", username);
 
     // Connection Pool 설정
@@ -113,7 +168,7 @@ public class DatabaseConfig {
     }
 
     // 현재 credential 정보 저장
-    currentCredentialInfo = dbSecret;
+    currentCredentialInfo = secretInfo;
 
     logger.info("🎉 Database Connection Pool 생성 완료 - Username: {}", username);
   }
@@ -143,46 +198,109 @@ public class DatabaseConfig {
   }
 
   /**
+   * KV 버전 체크 스케줄러
+   */
+  private static void scheduleKvVersionCheck(int intervalSeconds, String currentVersion) {
+    logger.info("⏰ KV 버전 체크 스케줄링 - {}초마다 실행", intervalSeconds);
+
+    scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+      Thread t = new Thread(r, "vault-kv-version-check");
+      t.setDaemon(true);
+      return t;
+    });
+
+    scheduler.scheduleAtFixedRate(() -> {
+      try {
+        SecretInfo newKvSecret = vaultSecretService.getKvSecret();
+        String newVersion = newKvSecret.getVersion();
+
+        if (!currentVersion.equals(newVersion)) {
+          logger.info("🔔 KV 버전 변경 감지 ({}→{}) - Connection Pool 재생성",
+              currentVersion, newVersion);
+          refreshCredentialsFromKv(newKvSecret);
+        } else {
+          logger.debug("✅ KV 버전 변경 없음 (version: {})", currentVersion);
+        }
+      } catch (Exception e) {
+        logger.error("❌ KV 버전 체크 실패: {}", e.getMessage(), e);
+      }
+    }, intervalSeconds, intervalSeconds, TimeUnit.SECONDS);
+  }
+
+  /**
+   * KV 자격증명 갱신
+   */
+  private static void refreshCredentialsFromKv(SecretInfo newKvSecret) {
+    logger.info("=== 🔄 KV 자격증명 갱신 시작 ===");
+
+    try {
+      Map<String, Object> data = (Map<String, Object>) newKvSecret.getData();
+      String username = (String) data.get("database_username");
+      String password = (String) data.get("database_password");
+
+      logger.info("✅ 새로운 KV 자격증명 조회 완료 - Username: {}", username);
+
+      // Connection Pool 재생성
+      closeDataSource();
+      createDataSource(username, password, newKvSecret);
+
+      // 다음 버전 체크 스케줄링
+      int refreshInterval = VaultConfig.getDatabaseKvRefreshInterval();
+      scheduleKvVersionCheck(refreshInterval, newKvSecret.getVersion());
+
+      logger.info("🎉 KV 자격증명 갱신 및 Connection Pool 재생성 완료");
+
+    } catch (Exception e) {
+      logger.error("❌ KV 자격증명 갱신 실패: {}", e.getMessage(), e);
+    }
+  }
+
+  /**
    * 자격증명 갱신
    */
   private static void refreshCredentials() {
-    logger.info("=== 🔄 Database Secret 자격증명 갱신 시작 ===");
+    String credentialSource = VaultConfig.getDatabaseCredentialSource();
+
+    logger.info("=== Database 자격증명 갱신 (소스: {}) ===", credentialSource);
 
     try {
-      // 1. 새로운 Dynamic Secret 조회
-      logger.info("📡 Vault에서 새로운 Database Dynamic Secret 조회 중...");
-      SecretInfo newSecret = vaultSecretService.getDatabaseDynamicSecret();
+      SecretInfo newSecret = null;
+      String username = null;
+      String password = null;
 
-      @SuppressWarnings("unchecked")
-      Map<String, Object> newData = (Map<String, Object>) newSecret.getData();
-      String newUsername = (String) newData.get("username");
-      String newPassword = (String) newData.get("password");
+      switch (credentialSource.toLowerCase()) {
+        case "kv":
+          // KV는 버전 체크에서 처리하므로 여기서는 호출되지 않음
+          logger.warn("⚠️ KV 자격증명은 버전 체크에서 갱신됩니다");
+          return;
+        case "dynamic":
+          newSecret = vaultSecretService.getDatabaseDynamicSecret();
+          Map<String, Object> dynamicData = (Map<String, Object>) newSecret.getData();
+          username = (String) dynamicData.get("username");
+          password = (String) dynamicData.get("password");
+          break;
+        case "static":
+          newSecret = vaultSecretService.getDatabaseStaticSecret();
+          Map<String, Object> staticData = (Map<String, Object>) newSecret.getData();
+          username = (String) staticData.get("username");
+          password = (String) staticData.get("password");
+          break;
+      }
 
-      logger.info("✅ 새로운 Database Secret 발급 완료");
-      logger.info("🔑 새로운 자격증명 - Username: {}, Password: ***", newUsername);
-      logger.info("⏰ 새로운 TTL: {}초", newSecret.getTtl());
-
-      // 2. 기존 Connection Pool 종료
-      logger.info("🔄 기존 Database Connection Pool 종료 중...");
+      // Connection Pool 재생성
       closeDataSource();
-      logger.info("✅ 기존 Database Connection Pool 종료 완료");
+      createDataSource(username, password, newSecret);
 
-      // 3. 새로운 Connection Pool 생성
-      logger.info("🆕 새로운 Database Connection Pool 생성 중...");
-      createDataSource(newSecret);
-      logger.info("✅ 새로운 Database Connection Pool 생성 완료");
-
-      // 4. 다음 갱신 스케줄링
-      if (newSecret.getTtl() != null && newSecret.getTtl() > 0) {
+      // Dynamic인 경우 다음 갱신 스케줄링
+      if ("dynamic".equals(credentialSource) && newSecret.getTtl() != null && newSecret.getTtl() > 0) {
         long refreshDelay = (long) (newSecret.getTtl() * 0.8 * 1000);
-        logger.info("⏰ 다음 자격증명 갱신 예정: {}초 후 (TTL의 80% 시점)", refreshDelay / 1000);
         scheduleCredentialRefresh(refreshDelay);
       }
 
-      logger.info("🎉 Database Secret 자격증명 갱신 및 Connection Pool 재생성 완료");
+      logger.info("🎉 Database 자격증명 갱신 완료");
 
     } catch (Exception e) {
-      logger.error("❌ Database Secret 자격증명 갱신 실패: {}", e.getMessage(), e);
+      logger.error("❌ Database 자격증명 갱신 실패: {}", e.getMessage(), e);
     }
   }
 

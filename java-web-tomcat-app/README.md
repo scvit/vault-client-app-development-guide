@@ -17,6 +17,12 @@
 - **Database Dynamic**: 동적 데이터베이스 자격증명 (Connection Pool 자동 갱신)
 - **Database Static**: 정적 데이터베이스 자격증명 (Vault API 직접 호출)
 
+### 🎛️ Database 자격증명 소스 선택
+애플리케이션은 Database 접속을 위해 다음 3가지 자격증명 소스 중 하나를 선택할 수 있습니다:
+- **KV Secret**: 정적 자격증명 (버전 변경 감지 기반 갱신)
+- **Database Dynamic Secret**: 동적 자격증명 (TTL 기반 자동 갱신)
+- **Database Static Secret**: 정적 관리 자격증명 (Vault에서 자동 rotate)
+
 ### 💡 개발 고려사항
 - **Tomcat 10**: Jakarta EE 9 기반 (Servlet 5.0, JSP 3.0)
 - **AppRole 인증**: Role ID + Secret ID를 통한 Vault 인증
@@ -126,7 +132,47 @@ vault.kv.path=my-vault-app-kv
 vault.database.path=my-vault-app-database
 vault.database.dynamic.role=db-demo-dynamic
 vault.database.static.role=db-demo-static
+
+# Database 자격증명 소스 선택 (kv, dynamic, static 중 하나)
+vault.database.credential.source=kv
+#vault.database.credential.source=dynamic
+#vault.database.credential.source=static
+
+# KV 기반 Database 자격증명 설정 (source=kv인 경우)
+vault.database.kv.path=my-vault-app-kv/data/database
+vault.database.kv.refresh_interval=30
+
+# Database URL 설정
+vault.database.url=jdbc:mysql://127.0.0.1:3306/mydb
+vault.database.driver=com.mysql.cj.jdbc.Driver
 ```
+
+### Database 자격증명 소스 선택
+
+`vault.properties`에서 Database 자격증명 소스를 선택할 수 있습니다:
+
+#### 1. KV Secret (정적 자격증명)
+```properties
+vault.database.credential.source=kv
+vault.database.kv.path=my-vault-app-kv/data/database
+vault.database.kv.refresh_interval=30
+```
+- 주기적으로 KV 버전 변경 감지
+- 버전이 변경되면 Connection Pool 재생성
+
+#### 2. Database Dynamic Secret (동적 자격증명)
+```properties
+vault.database.credential.source=dynamic
+```
+- TTL 기반 자동 갱신
+- TTL의 80% 시점에 새 자격증명 발급 및 Connection Pool 재생성
+
+#### 3. Database Static Secret (정적 관리 자격증명)
+```properties
+vault.database.credential.source=static
+```
+- Vault에서 자동으로 rotate
+- User는 유지되므로 애플리케이션에서는 주기적 갱신 불필요
 
 ### 환경변수 설정
 ```bash
@@ -254,6 +300,33 @@ mvn test
 5. **Tomcat 배포 실패**: Java 버전 및 Tomcat 버전 호환성 확인
 6. **JSP 렌더링 실패**: JSTL 의존성 및 설정 확인
 7. **자격증명 갱신 실패**: Vault API 권한 및 네트워크 연결 확인
+8. **KV Secret 중복 표시**: 설정 변경 후 Tomcat 완전 재시작 필요
+9. **자격증명 소스 설정 미적용**: vault.properties 수정 후 WAR 파일 재빌드 및 재배포 필요
+
+### 자격증명 소스 변경 시 주의사항
+
+자격증명 소스(`kv`, `dynamic`, `static`)를 변경한 후에는 다음 단계를 수행해야 합니다:
+
+```bash
+# 1. Tomcat 완전 정지
+./bin/shutdown.sh
+sleep 5
+
+# 2. 기존 배포 파일 삭제
+rm -rf webapps/vault-tomcat-app
+rm -f webapps/vault-tomcat-app.war
+
+# 3. 애플리케이션 재빌드
+mvn clean package
+
+# 4. 새로운 WAR 파일 배포
+cp target/vault-tomcat-app.war webapps/
+
+# 5. Tomcat 재시작
+./bin/startup.sh
+```
+
+**중요**: 설정 변경 후 Tomcat을 단순히 재시작하는 것으로는 충분하지 않습니다. 기존 배포된 클래스 파일들이 캐시되어 있기 때문에 완전한 재배포가 필요합니다.
 
 ## 📚 참고 자료
 

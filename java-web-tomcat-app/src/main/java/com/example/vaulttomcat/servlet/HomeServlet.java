@@ -38,14 +38,31 @@ public class HomeServlet extends HttpServlet {
         try {
           Map<String, SecretInfo> secrets = vaultSecretService.getDisplaySecrets();
 
-          // 현재 사용 중인 Database Dynamic Secret 정보 추가 (새로 발급하지 않음)
-          SecretInfo currentDbDynamic = vaultSecretService.getCurrentDatabaseDynamicSecret();
-          if (currentDbDynamic != null) {
-            secrets.put("dbDynamic", currentDbDynamic);
+          // 현재 사용 중인 Database 자격증명 정보 추가 (새로 발급하지 않음)
+          String credentialSource = com.example.vaulttomcat.config.VaultConfig.getDatabaseCredentialSource();
+
+          // static 모드인 경우, 이미 getAllSecrets()에서 dbStatic을 조회했으므로 중복 추가하지 않음
+          if (!"static".equals(credentialSource)) {
+            SecretInfo currentDbCredential = vaultSecretService.getCurrentDatabaseDynamicSecret();
+            if (currentDbCredential != null) {
+              if ("dynamic".equals(credentialSource)) {
+                secrets.put("dbDynamic", currentDbCredential);
+              } else if ("kv".equals(credentialSource)) {
+                secrets.put("dbKv", currentDbCredential);
+              }
+            }
+          }
+
+          // 디버깅을 위한 로그 추가
+          logger.info("🔍 현재 자격증명 소스: {}", credentialSource);
+          logger.info("🔍 secrets Map 키들: {}", secrets.keySet());
+          for (Map.Entry<String, SecretInfo> entry : secrets.entrySet()) {
+            logger.info("🔍 시크릿 키: {}, 타입: {}, 경로: {}",
+                entry.getKey(), entry.getValue().getType(), entry.getValue().getPath());
           }
 
           request.setAttribute("secrets", secrets);
-          logger.info("✅ Vault 시크릿 정보 로드 완료: {} 시크릿 (Database Dynamic Secret 포함)", secrets.size());
+          logger.info("✅ Vault 시크릿 정보 로드 완료: {} 시크릿 (Database 자격증명 포함)", secrets.size());
         } catch (Exception e) {
           logger.warn("⚠️ Vault 시크릿 조회 실패: {}", e.getMessage());
           request.setAttribute("vaultError", "Vault 시크릿 조회 실패: " + e.getMessage());

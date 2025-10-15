@@ -46,7 +46,7 @@ public class VaultSecretService {
     try {
       logger.info("=== KV Secret Refresh (Vault에서 조회) ===");
 
-      String kvPath = VaultConfig.getKvPath() + "/data/database";
+      String kvPath = VaultConfig.getDatabaseKvPath();
       Map<String, Object> response = vaultClient.getKvSecret(kvPath);
 
       if (response != null && response.containsKey("data")) {
@@ -79,7 +79,7 @@ public class VaultSecretService {
 
     } catch (Exception e) {
       logger.error("❌ KV 시크릿 조회 실패: {}", e.getMessage());
-      return createErrorSecretInfo("KV", VaultConfig.getKvPath() + "/data/database", e.getMessage());
+      return createErrorSecretInfo("KV", VaultConfig.getDatabaseKvPath(), e.getMessage());
     }
   }
 
@@ -180,8 +180,18 @@ public class VaultSecretService {
    */
   public Map<String, SecretInfo> getAllSecrets() {
     Map<String, SecretInfo> secrets = new HashMap<>();
+
+    // 현재 Database 자격증명 소스 확인
+    String credentialSource = VaultConfig.getDatabaseCredentialSource();
+
+    // KV Secret은 항상 조회 (Database 자격증명과 별개)
     secrets.put("kv", getKvSecret());
-    secrets.put("dbStatic", getDatabaseStaticSecret());
+
+    // Database Static Secret은 static 모드일 때만 조회
+    if ("static".equals(credentialSource)) {
+      secrets.put("dbStatic", getDatabaseStaticSecret());
+    }
+
     // dbDynamic은 DatabaseConfig에서 관리하므로 여기서는 조회하지 않음
     return secrets;
   }

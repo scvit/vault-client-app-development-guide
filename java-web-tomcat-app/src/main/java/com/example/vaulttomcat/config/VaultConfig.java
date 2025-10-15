@@ -70,6 +70,27 @@ public class VaultConfig {
     return getProperty("vault.database.static.role", "db-demo-static");
   }
 
+  // Database 자격증명 소스 (kv, dynamic, static)
+  public static String getDatabaseCredentialSource() {
+    return getProperty("vault.database.credential.source", "dynamic");
+  }
+
+  public static String getDatabaseKvPath() {
+    return getProperty("vault.database.kv.path", "my-vault-app-kv/data/database");
+  }
+
+  public static int getDatabaseKvRefreshInterval() {
+    return Integer.parseInt(getProperty("vault.database.kv.refresh_interval", "30"));
+  }
+
+  public static String getDatabaseUrl() {
+    return getProperty("vault.database.url", "jdbc:mysql://127.0.0.1:3306/mydb");
+  }
+
+  public static String getDatabaseDriver() {
+    return getProperty("vault.database.driver", "com.mysql.cj.jdbc.Driver");
+  }
+
   private static String getProperty(String key, String defaultValue) {
     // 1. 시스템 프로퍼티 확인
     String systemProperty = System.getProperty(key);

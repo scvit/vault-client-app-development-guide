@@ -230,6 +230,7 @@ Development-Guide/
   - Apache Commons DBCP2 Connection Pool 자동 갱신
   - JSP + JSTL을 통한 웹 UI 제공
   - MySQL 연동 및 Database 통계 정보 표시
+  - **자격증명 소스 선택**: KV, Dynamic, Static 중 선택 가능
 - **빌드**: `mvn clean package`
 - **실행**: Tomcat 10에 WAR 배포
 - **웹 접속**: `http://localhost:8080/vault-tomcat-app`
