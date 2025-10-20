@@ -115,6 +115,7 @@ spring:
 spring:
   cloud:
     vault:
+      namespace: <namespace 이름>
       host: localhost
       port: 8200
       scheme: http
