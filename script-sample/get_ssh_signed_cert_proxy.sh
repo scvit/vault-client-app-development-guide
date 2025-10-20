@@ -3,6 +3,7 @@
 # Vault Proxy를 통한 SSH Signed Certificate 생성 스크립트
 
 VAULT_PROXY_ADDR="http://127.0.0.1:8400"
+VAULT_NAMESPACE=""  # Vault Namespace (필요시 설정, 예: "my-namespace")
 SSH_CA_PATH="my-vault-app-ssh-ca/sign/client-signer"
 
 # 사용자 설정 (수정 필요)
@@ -27,11 +28,20 @@ fi
 PUBLIC_KEY=$(cat "$SSH_PUBLIC_KEY_PATH")
 
 # SSH Signed Certificate 생성
-RESPONSE=$(curl -s -w "\n%{http_code}" \
-    -X POST \
-    -H "Content-Type: application/json" \
-    -d "{\"public_key\":\"$PUBLIC_KEY\",\"valid_principals\":\"$SSH_USERNAME\"}" \
-    "$VAULT_PROXY_ADDR/v1/$SSH_CA_PATH")
+if [ -n "$VAULT_NAMESPACE" ]; then
+    RESPONSE=$(curl -s -w "\n%{http_code}" \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -H "X-Vault-Namespace: $VAULT_NAMESPACE" \
+        -d "{\"public_key\":\"$PUBLIC_KEY\",\"valid_principals\":\"$SSH_USERNAME\"}" \
+        "$VAULT_PROXY_ADDR/v1/$SSH_CA_PATH")
+else
+    RESPONSE=$(curl -s -w "\n%{http_code}" \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"public_key\":\"$PUBLIC_KEY\",\"valid_principals\":\"$SSH_USERNAME\"}" \
+        "$VAULT_PROXY_ADDR/v1/$SSH_CA_PATH")
+fi
 
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')

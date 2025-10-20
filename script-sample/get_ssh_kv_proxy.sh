@@ -3,6 +3,7 @@
 # Vault Proxy를 통한 SSH KV 자격증명 조회 및 연결 스크립트
 
 VAULT_PROXY_ADDR="http://127.0.0.1:8400"
+VAULT_NAMESPACE=""  # Vault Namespace (필요시 설정, 예: "my-namespace")
 DEFAULT_SSH_HOST="10.10.0.222"
 SSH_HOST="${1:-$DEFAULT_SSH_HOST}"
 KV_PATH="my-vault-app-kv/data/ssh/$SSH_HOST"
@@ -14,7 +15,14 @@ echo "Target Host: $SSH_HOST"
 echo ""
 
 # KV에서 SSH 자격증명 조회
-RESPONSE=$(curl -s -w "\n%{http_code}" "$VAULT_PROXY_ADDR/v1/$KV_PATH")
+if [ -n "$VAULT_NAMESPACE" ]; then
+    RESPONSE=$(curl -s -w "\n%{http_code}" \
+        -H "X-Vault-Namespace: $VAULT_NAMESPACE" \
+        "$VAULT_PROXY_ADDR/v1/$KV_PATH")
+else
+    RESPONSE=$(curl -s -w "\n%{http_code}" \
+        "$VAULT_PROXY_ADDR/v1/$KV_PATH")
+fi
 
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')

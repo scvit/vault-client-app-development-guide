@@ -9,6 +9,7 @@
 
 # Vault Proxy 설정 (하드코딩)
 VAULT_PROXY_ADDR="http://127.0.0.1:8400"
+VAULT_NAMESPACE=""  # Vault Namespace (필요시 설정, 예: "my-namespace")
 DB_STATIC_PATH="my-vault-app-database/static-creds/db-demo-static"
 
 # 색상 정의
@@ -61,7 +62,14 @@ get_db_static_secret() {
     log_info "Database Static 시크릿 조회 중... ($DB_STATIC_PATH)"
     
     # curl로 시크릿 조회
-    RESPONSE=$(curl -s -w "\n%{http_code}" "$VAULT_PROXY_ADDR/v1/$DB_STATIC_PATH")
+    if [ -n "$VAULT_NAMESPACE" ]; then
+        RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -H "X-Vault-Namespace: $VAULT_NAMESPACE" \
+            "$VAULT_PROXY_ADDR/v1/$DB_STATIC_PATH")
+    else
+        RESPONSE=$(curl -s -w "\n%{http_code}" \
+            "$VAULT_PROXY_ADDR/v1/$DB_STATIC_PATH")
+    fi
     
     # HTTP 상태 코드와 응답 본문 분리
     HTTP_CODE=$(echo "$RESPONSE" | tail -n1)

@@ -3,6 +3,7 @@
 # Vault Proxy를 통한 SSH OTP 생성 스크립트
 
 VAULT_PROXY_ADDR="http://127.0.0.1:8400"
+VAULT_NAMESPACE=""  # Vault Namespace (필요시 설정, 예: "my-namespace")
 SSH_OTP_PATH="my-vault-app-ssh-otp/creds/otp-role"
 
 # 사용자 설정 (수정 필요)
@@ -16,11 +17,20 @@ echo "Target: $SSH_USERNAME@$SSH_HOST"
 echo ""
 
 # SSH OTP 생성
-RESPONSE=$(curl -s -w "\n%{http_code}" \
-    -X POST \
-    -H "Content-Type: application/json" \
-    -d "{\"ip\":\"$SSH_HOST\",\"username\":\"$SSH_USERNAME\"}" \
-    "$VAULT_PROXY_ADDR/v1/$SSH_OTP_PATH")
+if [ -n "$VAULT_NAMESPACE" ]; then
+    RESPONSE=$(curl -s -w "\n%{http_code}" \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -H "X-Vault-Namespace: $VAULT_NAMESPACE" \
+        -d "{\"ip\":\"$SSH_HOST\",\"username\":\"$SSH_USERNAME\"}" \
+        "$VAULT_PROXY_ADDR/v1/$SSH_OTP_PATH")
+else
+    RESPONSE=$(curl -s -w "\n%{http_code}" \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"ip\":\"$SSH_HOST\",\"username\":\"$SSH_USERNAME\"}" \
+        "$VAULT_PROXY_ADDR/v1/$SSH_OTP_PATH")
+fi
 
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
