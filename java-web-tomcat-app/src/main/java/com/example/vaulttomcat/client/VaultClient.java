@@ -24,6 +24,7 @@ public class VaultClient {
   private static final Logger logger = LoggerFactory.getLogger(VaultClient.class);
 
   private final String vaultUrl;
+  private final String vaultNamespace;
   private String vaultToken; // final 제거
   private long tokenExpiry; // 추가
   private boolean renewable; // 추가
@@ -32,6 +33,7 @@ public class VaultClient {
 
   public VaultClient() {
     this.vaultUrl = VaultConfig.getVaultUrl();
+    this.vaultNamespace = VaultConfig.getVaultNamespace();
     this.httpClient = HttpClients.createDefault();
     this.objectMapper = new ObjectMapper();
 
@@ -43,8 +45,10 @@ public class VaultClient {
       this.vaultToken = VaultConfig.getVaultToken();
     }
 
-    logger.info("VaultClient initialized - URL: {}, Auth Type: {}",
-        vaultUrl, VaultConfig.getAuthType());
+    logger.info("VaultClient initialized - URL: {}, Namespace: {}, Auth Type: {}",
+        vaultUrl,
+        vaultNamespace.isEmpty() ? "(root)" : vaultNamespace,
+        VaultConfig.getAuthType());
   }
 
   /**
@@ -67,6 +71,11 @@ public class VaultClient {
     request.setHeader("X-Vault-Token", vaultToken);
     request.setHeader("Content-Type", "application/json");
 
+    // Namespace 헤더 추가
+    if (vaultNamespace != null && !vaultNamespace.isEmpty()) {
+      request.setHeader("X-Vault-Namespace", vaultNamespace);
+    }
+
     try (CloseableHttpResponse response = httpClient.execute(request)) {
       return parseResponse(response);
     }
@@ -76,6 +85,11 @@ public class VaultClient {
     HttpPost request = new HttpPost(url);
     request.setHeader("X-Vault-Token", vaultToken);
     request.setHeader("Content-Type", "application/json");
+
+    // Namespace 헤더 추가
+    if (vaultNamespace != null && !vaultNamespace.isEmpty()) {
+      request.setHeader("X-Vault-Namespace", vaultNamespace);
+    }
 
     if (data != null && !data.isEmpty()) {
       String jsonData = objectMapper.writeValueAsString(data);
@@ -180,6 +194,11 @@ public class VaultClient {
     String url = vaultUrl + "/v1/auth/approle/login";
     HttpPost request = new HttpPost(url);
     request.setHeader("Content-Type", "application/json");
+
+    // Namespace 헤더 추가
+    if (vaultNamespace != null && !vaultNamespace.isEmpty()) {
+      request.setHeader("X-Vault-Namespace", vaultNamespace);
+    }
 
     String jsonData = objectMapper.writeValueAsString(authData);
     request.setEntity(new StringEntity(jsonData, ContentType.APPLICATION_JSON));

@@ -91,6 +91,10 @@ public class VaultConfig {
     return getProperty("vault.database.driver", "com.mysql.cj.jdbc.Driver");
   }
 
+  public static String getVaultNamespace() {
+    return getProperty("vault.namespace", "");
+  }
+
   private static String getProperty(String key, String defaultValue) {
     // 1. 시스템 프로퍼티 확인
     String systemProperty = System.getProperty(key);
