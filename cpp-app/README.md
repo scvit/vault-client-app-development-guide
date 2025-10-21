@@ -1,3 +1,312 @@
+# 🔧 C++ Vault Client Application
+
+[아래 원본 한국어 섹션으로 이동](#-c-vault-클라이언트-애플리케이션)
+
+`vault-app` is a Vault client application implemented in C++. It supports KV, Database Dynamic, and Database Static secret engines, and provides real-time secret renewal and caching features.
+
+- The example provides scenarios for using KV, Database Dynamic, and Database Static secrets.
+- If needed only for initial application startup, it makes an API call once and then utilizes the cache for subsequent runs to reduce memory usage.
+- The example is implemented to periodically fetch and renew secrets.
+
+## ✨ Key Features
+
+- **🔐 Multi-Secret Engine Support**: KV v2, Database Dynamic, Database Static
+- **⚡ Real-time Renewal**: Automatic secret renewal via background threads.
+- **💾 Efficient Caching**: Version-based KV caching, TTL-based Database caching.
+- **🔄 Automatic Token Renewal**: Automatic token renewal at the 4/5 point of TTL.
+- **📊 Metadata Display**: Provides useful information like version, TTL, etc.
+- **🛡️ Security**: Entity-based permission management and secure memory handling.
+- **🚀 Modern C++**: Uses C++17 standard, RAII pattern, and smart pointers.
+
+## 🏗️ Project Structure
+
+```
+cpp-app/
+├── CMakeLists.txt                 # CMake build configuration
+├── config.ini                     # Application configuration file
+├── README.md                      # This file
+├── include/
+│   ├── Config.hpp                 # Configuration management class
+│   ├── VaultClient.hpp           # Vault client class
+│   └── HttpClient.hpp            # HTTP client wrapper
+├── src/
+│   ├── main.cpp                   # Main application
+│   ├── Config.cpp                 # Configuration implementation
+│   ├── VaultClient.cpp            # Vault client implementation
+│   └── HttpClient.cpp             # HTTP client implementation
+└── third_party/
+    └── json.hpp                   # nlohmann/json (single header)
+```
+
+## 🚀 Quick Start
+
+### 1. Install Required Libraries
+
+**Ubuntu/Debian**:
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential cmake libcurl4-openssl-dev
+```
+
+**CentOS/RHEL**:
+```bash
+sudo yum install gcc-c++ cmake libcurl-devel
+```
+
+**macOS (Homebrew)**:
+```bash
+brew install cmake curl
+```
+
+### 2. Build and Run
+
+```bash
+# Create build directory
+mkdir build && cd build
+
+# Configure with CMake
+cmake ..
+
+# Build
+make
+
+# Run
+./vault-app
+
+# Run with a custom config file
+./vault-app ../config.ini
+
+# Run in WSL
+wsl -e bash -c "cd /mnt/d/workspaces/vault-client-app-development-guide/cpp-app/build && ./vault-app ../config.ini"
+```
+
+### 3. Configure the Configuration File
+
+Modify the `config.ini` file to set up your Vault connection information:
+
+```ini
+[vault]
+entity = my-vault-app
+url = http://127.0.0.1:8200
+namespace = 
+role_id = your-role-id-here
+secret_id = your-secret-id-here
+
+[secret-kv]
+enabled = true
+kv_path = database
+refresh_interval = 5
+
+[secret-database-dynamic]
+enabled = true
+role_id = db-demo-dynamic
+
+[secret-database-static]
+enabled = true
+role_id = db-demo-static
+
+[http]
+timeout = 30
+max_response_size = 4096
+```
+
+## 📋 Example Output
+
+```
+=== Vault C++ Client Application ===
+Loading configuration from: config.ini
+=== Application Configuration ===
+Vault URL: http://127.0.0.1:8200
+Vault Namespace: (empty)
+Entity: my-vault-app
+Vault Role ID: 7fb49dd0-4b87-19cd-7b72-a7e21e5c543e
+Vault Secret ID: 475a6500-f9f8-fdd4-ec30-54fadcad926e
+
+--- Secret Engines ---
+KV Engine: enabled
+  KV Path: database
+  Refresh Interval: 5 seconds
+Database Dynamic: enabled
+  Role ID: db-demo-dynamic
+Database Static: enabled
+  Role ID: db-demo-static
+
+--- HTTP Settings ---
+HTTP Timeout: 30 seconds
+Max Response Size: 4096 bytes
+=====================================
+Logging in to Vault...
+Token TTL from Vault: 60 seconds
+Login successful. Token expires in 60 seconds
+Token status: 60 seconds remaining (expires in 1 minutes)
+✅ Token is healthy (at 0% of TTL)
+✅ KV refresh thread started (interval: 5 seconds)
+✅ Database Dynamic refresh thread started (interval: 5 seconds)
+✅ Database Static refresh thread started (interval: 10 seconds)
+
+=== Fetching Secret ===
+📦 KV Secret Data (version: 10):
+{ "api_key": "myapp-api-key-123456", "database_url": "mysql://localhost:3306/mydb" }
+
+🗄️ Database Dynamic Secret (TTL: 59 seconds):
+  username: v-approle-db-demo-dy-0x50Hgcj5Mj
+  password: AdCNFYg6wDV6p8fz-byK
+
+🔒 Database Static Secret (TTL: 2412 seconds):
+  username: my-vault-app-static
+  password: sntZ-lhR2rZ9GLjgGvry
+
+--- Token Status ---
+Token status: 60 seconds remaining (expires in 1 minutes)
+✅ Token is healthy (at 0% of TTL)
+```
+
+## 🔧 Configuration Options
+
+### Vault Settings (`[vault]`)
+- `entity`: Entity name (required)
+- `url`: Vault server address
+- `namespace`: Vault namespace (optional)
+- `role_id`: AppRole Role ID
+- `secret_id`: AppRole Secret ID
+
+### KV Secret Settings (`[secret-kv]`)
+- `enabled`: Whether the KV engine is enabled
+- `kv_path`: KV secret path
+- `refresh_interval`: Refresh interval (seconds)
+
+### Database Dynamic Settings (`[secret-database-dynamic]`)
+- `enabled`: Whether the Database Dynamic engine is enabled
+- `role_id`: Database Dynamic Role ID
+
+### Database Static Settings (`[database-static]`)
+- `enabled`: Whether the Database Static engine is enabled
+- `role_id`: Database Static Role ID
+
+### HTTP Settings (`[http]`)
+- `timeout`: HTTP request timeout (seconds)
+- `max_response_size`: Maximum response size (bytes)
+
+## 🏗️ Architecture
+
+### Thread Structure
+- **Main Thread**: Fetches and prints secrets.
+- **Token Renewal Thread**: Checks token status every 10 seconds, renews at 4/5 of TTL.
+- **KV Renewal Thread**: Renews KV secrets at the configured interval.
+- **Database Dynamic Renewal Thread**: Renews Dynamic secrets at the configured interval.
+- **Database Static Renewal Thread**: Renews Static secrets at double the interval.
+
+### Caching Strategy
+- **KV Secret**: Version-based caching (renews only when the version changes).
+- **Database Dynamic**: TTL-based caching (renews when TTL is 10 seconds or less).
+- **Database Static**: Time-based caching (renews every 5 minutes).
+
+### Security Features
+- **Entity-based Permissions**: Uses `{entity}-{engine}` path patterns.
+- **Automatic Token Renewal**: Automatically renews tokens before expiration.
+- **Memory Security**: Automatic memory management with smart pointers.
+- **Error Handling**: Retries on network errors or token expiration.
+
+## 🔍 Developer Guide
+
+### Core Implementation Points
+
+**1. Memory Management**
+```cpp
+// ✅ Correct way: Use smart pointers
+std::unique_ptr<HttpClient> http_client_;
+std::shared_ptr<nlohmann::json> cached_secret_;
+
+// ✅ Automatic resource cleanup with RAII pattern
+class HttpClient {
+    ~HttpClient() {
+        if (curl_) {
+            curl_easy_cleanup(curl_);
+        }
+    }
+};
+```
+
+**2. Token Renewal Logic**
+```cpp
+// Renew at 4/5 point (when 80% of token TTL has passed)
+auto total_ttl = get_duration_seconds(token_issued_, token_expiry_);
+auto elapsed = get_duration_seconds(token_issued_, now());
+auto renewal_point = total_ttl * 4 / 5;
+if (elapsed >= renewal_point) {
+    renew_token();
+}
+```
+
+**3. Thread Safety**
+```cpp
+// Synchronize with a mutex
+mutable std::mutex token_mutex_;
+std::lock_guard<std::mutex> lock(token_mutex_);
+
+// Manage exit flag with an atomic variable
+std::atomic<bool> should_exit{false};
+```
+
+### Key Classes
+
+**ConfigLoader Class**
+- Parses INI files.
+- Validates configuration.
+- Manages default values.
+
+**HttpClient Class**
+- C++ wrapper for libcurl.
+- Manages resources with the RAII pattern.
+- Supports GET/POST methods.
+
+**VaultClient Class**
+- Handles AppRole authentication.
+- Automatic token renewal.
+- Caches and renews secrets.
+- Thread-safe methods.
+
+## 🐛 Troubleshooting
+
+### Build Errors
+- **Missing Libraries**: `sudo apt-get install libcurl4-openssl-dev` (Ubuntu)
+- **CMake Version**: Requires CMake 3.10 or higher.
+- **Compiler**: Requires a C++17 compliant compiler (GCC 7+, Clang 5+).
+
+### Runtime Errors
+- **Vault Connection Failure**: Check Vault server status and URL.
+- **Authentication Failure**: Verify Role ID and Secret ID.
+- **Permission Errors**: Check Entity policies and path permissions.
+
+### Performance Optimization
+- **Memory Usage**: Prevent unnecessary secret renewals.
+- **Network Calls**: Optimize caching strategy.
+- **Thread Management**: Set appropriate renewal intervals.
+
+## 📚 References
+
+- [Vault API Documentation](https://developer.hashicorp.com/vault/api-docs)
+- [Database Secrets Engine](https://developer.hashicorp.com/vault/api-docs/secret/databases)
+- [KV Secrets Engine](https://developer.hashicorp.com/vault/api-docs/secret/kv)
+- [AppRole Auth Method](https://developer.hashicorp.com/vault/api-docs/auth/approle)
+- [nlohmann/json Library](https://github.com/nlohmann/json)
+- [libcurl Documentation](https://curl.se/libcurl/)
+
+## 🔄 Differences from the C Version
+
+### Improvements
+1.  **Type Safety**: Utilizes the C++ type system.
+2.  **Memory Management**: Automatic cleanup with smart pointers.
+3.  **Error Handling**: Adds exception handling.
+4.  **Code Readability**: Class-based structure.
+5.  **Build System**: Improved dependency management with CMake.
+
+### What's Kept the Same
+1.  **Same Functionality**: Supports KV, Database Dynamic/Static.
+2.  **Same Configuration**: Retains the `config.ini` format.
+3.  **Same Behavior**: Identical token renewal and caching strategies.
+4.  **Same Output**: Consistent user experience.
+
 # 🔧 C++ Vault 클라이언트 애플리케이션
 
 `vault-app`은 C++로 구현된 Vault 클라이언트 애플리케이션입니다. KV, Database Dynamic, Database Static 시크릿 엔진을 지원하며, 실시간 시크릿 갱신과 캐싱 기능을 제공합니다.
@@ -293,14 +602,14 @@ std::atomic<bool> should_exit{false};
 ## 🔄 C 버전과의 차이점
 
 ### 개선사항
-1. **타입 안전성**: C++ 타입 시스템 활용
-2. **메모리 관리**: 스마트 포인터로 자동 정리
-3. **에러 처리**: 예외 처리 추가
-4. **코드 가독성**: 클래스 기반 구조
-5. **빌드 시스템**: CMake로 의존성 관리 개선
+1.  **타입 안전성**: C++ 타입 시스템 활용
+2.  **메모리 관리**: 스마트 포인터로 자동 정리
+3.  **에러 처리**: 예외 처리 추가
+4.  **코드 가독성**: 클래스 기반 구조
+5.  **빌드 시스템**: CMake로 의존성 관리 개선
 
 ### 유지사항
-1. **동일한 기능**: KV, Database Dynamic/Static 지원
-2. **동일한 설정**: config.ini 형식 유지
-3. **동일한 동작**: 토큰 갱신, 캐싱 전략 동일
-4. **동일한 출력**: 사용자 경험 일관성
+1.  **동일한 기능**: KV, Database Dynamic/Static 지원
+2.  **동일한 설정**: config.ini 형식 유지
+3.  **동일한 동작**: 토큰 갱신, 캐싱 전략 동일
+4.  **동일한 출력**: 사용자 경험 일관성

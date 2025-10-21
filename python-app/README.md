@@ -1,3 +1,274 @@
+# Vault Python Client Application
+
+[아래 원본 한국어 섹션으로 이동](#vault-python-클라이언트-애플리케이션)
+
+## 📖 Example Purpose and Usage Scenarios
+
+This example is a reference application for Vault integration development.
+If needed only for initial application startup, it makes an API call once and then utilizes the cache for subsequent runs to reduce memory usage.
+The example is implemented to periodically fetch and renew secrets.
+It is designed using the hvac library rather than being implemented as a library solely for Vault.
+
+### 🎯 Key Scenarios
+- **Initial Startup**: Fetches secrets from Vault only once when the application starts.
+- **Real-time Renewal**: Periodically renews secrets to maintain the latest state.
+- **Cache Utilization**: Minimizes unnecessary API calls through version/TTL-based caching.
+
+### 🔐 Supported Secret Types
+- **KV v2**: Key-value store (version-based caching).
+- **Database Dynamic**: Dynamic database credentials (TTL-based renewal).
+- **Database Static**: Static database credentials (time-based caching).
+
+### 💡 Development Considerations
+- **Memory Management**: Optimizes memory usage through secret caching.
+- **Error Handling**: Handles exceptions such as network errors and authentication failures.
+- **Security**: Meets security requirements like token renewal and secret encryption.
+- **Performance**: Optimizes performance through asynchronous processing, connection pooling, etc.
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
+- Python 3.7 or higher.
+- pip (Python package manager).
+- Vault server (with development server setup completed).
+
+### 2. Create Virtual Environment and Install Dependencies
+
+```bash
+# Create a Python virtual environment
+python3 -m venv venv
+
+# Activate the virtual environment
+source venv/bin/activate
+
+# Install Python packages
+pip install -r requirements.txt
+```
+
+**Note for macOS users**: 
+You cannot install packages directly into the system Python environment on macOS. You must use a virtual environment.
+
+### 3. Modify Configuration File
+You can change the Vault connection settings by modifying the `config.ini` file.
+
+### 4. Run the Application
+
+```bash
+# Run with the virtual environment activated
+python vault_app.py
+
+# Or run directly
+python3 vault_app.py
+```
+
+### 5. Deactivate Virtual Environment
+
+```bash
+# Deactivate the virtual environment after you are done
+deactivate
+```
+
+## 📋 Example Output
+
+```
+🚀 Starting Vault Python Client Application
+✅ Vault login successful
+⚙️ Current Configuration:
+- Entity: my-vault-app
+- Vault URL: http://127.0.0.1:8200
+- KV Enabled: true
+- Database Dynamic Enabled: true
+- Database Static Enabled: true
+
+📖 Example Purpose and Usage Scenarios
+This example is a reference application for Vault integration development.
+If needed only for initial application startup, it makes an API call once and then utilizes the cache for subsequent runs to reduce memory usage.
+The example is implemented to periodically fetch and renew secrets.
+
+🔧 Supported Features:
+- KV v2 Secret Engine (version-based caching)
+- Database Dynamic Secret Engine (TTL-based renewal)
+- Database Static Secret Engine (time-based caching)
+- Automatic Token Renewal
+- Entity-based Permission Management
+
+🔄 Starting secret renewal... (Press Ctrl+C to exit)
+
+=== KV Secret Refresh ===
+✅ KV secret fetch successful
+📦 KV Secret Data:
+{
+  "api_key": "myapp-api-key-123456",
+  "database_url": "mysql://localhost:3306/mydb"
+}
+
+=== Database Dynamic Secret Refresh ===
+✅ Database Dynamic secret fetch successful (TTL: 60s)
+🗄️ Database Dynamic Secret (TTL: 60s):
+  username: v-approle-db-demo-dy-JRHTDBobE5o
+  password: qLteLnVHZdBcmR-sJS1b
+
+=== Database Static Secret Refresh ===
+✅ Database Static secret fetch successful (TTL: 3600s)
+🔒 Database Static Secret (TTL: 3600s):
+  username: my-vault-app-static
+  password: OfK6S-6R2PiWA0C8Fqxj
+```
+
+## ⚙️ Configuration Options
+
+### Configuration Priority
+
+Generally, predefined configurations are defined in the `config.ini` file. Since the `secret_id` used for Vault authentication expires after issuance, it is implemented to be overridden by an environment variable at runtime.
+
+1.  **Environment Variables** - Highest priority
+2.  **config.ini file** - Default value
+
+### How to Use Environment Variables
+```bash
+# Override settings with environment variables at runtime
+export VAULT_ROLE_ID=your-role-id
+export VAULT_SECRET_ID=your-secret-id
+export VAULT_URL=http://your-vault-server:8200
+python vault_app.py
+
+# Or individual settings
+export VAULT_SECRET_ID=3ee5080b-c9b3-2714-799c-f8d45a715625
+python vault_app.py
+```
+
+### Vault Server Settings
+```ini
+[vault]
+# Entity name (required)
+entity = my-vault-app
+# Vault server address
+url = http://127.0.0.1:8200
+# Vault namespace (optional)
+namespace = 
+# AppRole authentication info (required)
+role_id = 7fb49dd0-4b87-19cd-7b72-a7e21e5c543e
+secret_id = 475a6500-f9f8-fdd4-ec30-54fadcad926e
+```
+
+### Secret Engine Settings
+```ini
+[kv_secret]
+# KV Secret settings
+enabled = true
+path = database
+refresh_interval = 5
+
+[database_dynamic]
+# Database Dynamic Secret settings
+enabled = true
+role_id = db-demo-dynamic
+
+[database_static]
+# Database Static Secret settings
+enabled = true
+role_id = db-demo-static
+```
+
+### HTTP Settings
+```ini
+[http]
+# HTTP request timeout (seconds)
+timeout = 30
+# Maximum response size (bytes)
+max_response_size = 4096
+```
+
+## 🏗️ Architecture
+
+### File Structure
+```
+python-app/
+├── README.md                      # Usage guide
+├── requirements.txt               # Python package dependencies
+├── config.ini                     # Configuration file
+├── vault_app.py                   # Main application
+├── vault_client.py                # Vault client class
+└── config_loader.py               # Configuration loader
+```
+
+### Key Components
+- **VaultApplication**: Main application logic, scheduler management.
+- **VaultConfig**: Loads and manages configuration files.
+- **VaultClient**: Vault API integration, secret retrieval, caching.
+
+### Caching Strategy
+- **KV v2**: Version-based caching (5-minute interval).
+- **Database Dynamic**: TTL-based caching (10-second threshold).
+- **Database Static**: Time-based caching (5-minute interval).
+
+### Real-time TTL Calculation
+- Displays the real-time decrease of the TTL for Database Dynamic/Static Secrets.
+- Calculates the remaining TTL by subtracting the elapsed time from the cached TTL.
+- Prevents negative values with `max(0, remaining_ttl)`.
+
+## 🛠️ Developer Guide
+
+### 1. Understanding the Project Structure
+```
+python-app/
+├── vault_app.py                   # Main application
+├── vault_client.py                # Vault client
+├── config_loader.py               # Configuration class
+└── config.ini                     # Configuration file
+```
+
+### 2. Implementing Key Features
+- **Authentication**: AppRole-based Vault authentication.
+- **Token Management**: Automatic token renewal.
+- **Secret Retrieval**: Fetches KV, Database Dynamic, and Static secrets.
+- **Caching**: Efficient secret caching strategy.
+- **TTL Management**: Real-time TTL calculation and display.
+
+### 3. Extensible Structure
+- Add new secret engines.
+- Implement custom caching strategies.
+- Enhance monitoring and logging.
+
+## 🔧 Build and Run
+
+```bash
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python vault_app.py
+
+# Deactivate the virtual environment
+deactivate
+```
+
+## 🐛 Troubleshooting
+
+1.  **Vault Connection Failure**: Check URL, namespace.
+2.  **Authentication Failure**: Check Role ID, Secret ID.
+3.  **Permission Error**: Check Entity policies.
+4.  **Secret Retrieval Failure**: Check if the secret engine is enabled.
+5.  **Package Installation Failure**: Check if you are using a virtual environment.
+    ```bash
+    # If package installation fails on macOS
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    ```
+
+## 📚 References
+
+- [Vault API Documentation](https://www.vaultproject.io/api-docs)
+- [AppRole Auth Method](https://www.vaultproject.io/docs/auth/approle)
+- [KV v2 Secrets Engine](https://www.vaultproject.io/docs/secrets/kv/kv-v2)
+- [Database Secrets Engine](https://www.vaultproject.io/docs/secrets/databases)
+- [hvac Python Library](https://hvac.readthedocs.io/)
+
 # Vault Python 클라이언트 애플리케이션
 
 ## 📖 예제 목적 및 사용 시나리오
@@ -247,17 +518,17 @@ deactivate
 
 ## 🐛 문제 해결
 
-1. **Vault 연결 실패**: URL, 네임스페이스 확인
-2. **인증 실패**: Role ID, Secret ID 확인
-3. **권한 오류**: Entity 정책 확인
-4. **시크릿 조회 실패**: 시크릿 엔진 활성화 확인
-5. **패키지 설치 실패**: 가상환경 사용 확인
-   ```bash
-   # macOS에서 패키지 설치 오류 시
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
+1.  **Vault 연결 실패**: URL, 네임스페이스 확인
+2.  **인증 실패**: Role ID, Secret ID 확인
+3.  **권한 오류**: Entity 정책 확인
+4.  **시크릿 조회 실패**: 시크릿 엔진 활성화 확인
+5.  **패키지 설치 실패**: 가상환경 사용 확인
+    ```bash
+    # macOS에서 패키지 설치 오류 시
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    ```
 
 ## 📚 참고 자료
 

@@ -1,5 +1,348 @@
 # Vault Tomcat Web Application
 
+[아래 원본 한국어 섹션으로 이동](#vault-tomcat-web-application)
+
+## 📖 Example Purpose and Usage Scenarios
+
+This example demonstrates how to securely manage secrets in a **traditional Java Web Application** using Vault.
+It is implemented based on **Servlet + JSP**, and maintains continuous security through **AppRole Authentication** and **Token Auto-Renewal**.
+
+### 🎯 Key Scenarios
+- **Traditional Java Web**: A web application based on Servlet + JSP (without Spring Boot).
+- **AppRole Authentication**: Machine-to-machine authentication for secure access to Vault.
+- **Token Auto-Renewal**: Automatically checks token status every 10 seconds and renews at 80% of TTL.
+- **Connection Pool**: Manages database connection pool using Apache Commons DBCP2.
+- **Automatic Renewal**: Automatically renews database credentials based on TTL.
+
+### 🔐 Supported Secret Types
+- **KV v2**: Key-value store (direct Vault API call).
+- **Database Dynamic**: Dynamic database credentials (automatic connection pool renewal).
+- **Database Static**: Static database credentials (direct Vault API call).
+
+### 🎛️ Database Credential Source Selection
+The application can choose one of the following three credential sources for database access:
+- **KV Secret**: Static credentials (renewal based on version change detection).
+- **Database Dynamic Secret**: Dynamic credentials (TTL-based automatic renewal).
+- **Database Static Secret**: Statically managed credentials (automatically rotated by Vault).
+
+### 💡 Development Considerations
+- **Tomcat 10**: Based on Jakarta EE 9 (Servlet 5.0, JSP 3.0).
+- **AppRole Authentication**: Vault authentication via Role ID + Secret ID.
+- **Token Renewal**: Automatic token renewal via `ScheduledExecutorService`.
+- **Connection Pool**: Database connection management using Apache Commons DBCP2.
+- **Web UI**: User-friendly interface through JSP + JSTL.
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
+- Java 11 or higher.
+- Maven 3.6 or higher.
+- Tomcat 10.
+- Vault server (with development server setup completed).
+- MySQL (for database integration).
+
+### 2. Build and Deploy
+
+```bash
+# Build with Maven
+mvn clean package
+
+# Copy the WAR file to the Tomcat webapps directory
+cp target/vault-tomcat-app.war $TOMCAT_HOME/webapps/
+
+# Start Tomcat
+$TOMCAT_HOME/bin/startup.sh
+```
+
+### 3. Access in Web Browser
+```
+http://localhost:8080/vault-tomcat-app/
+```
+
+## 📋 Key Features
+
+### 1. AppRole Authentication and Token Auto-Renewal
+Securely access Vault via **AppRole Authentication** and maintain continuous security with **Token Auto-Renewal**:
+
+```java
+// AppRole Authentication (VaultClient.java)
+private void authenticateWithAppRole() {
+    String roleId = VaultConfig.getAppRoleId();
+    String secretId = VaultConfig.getAppRoleSecretId();
+    
+    Map<String, Object> authData = new HashMap<>();
+    authData.put("role_id", roleId);
+    authData.put("secret_id", secretId);
+    
+    // Obtain token by calling Vault API
+    Map<String, Object> response = callAppRoleLogin(authData);
+    this.vaultToken = (String) auth.get("client_token");
+    this.tokenExpiry = System.currentTimeMillis() + (leaseDuration * 1000L);
+}
+
+// Token Auto-Renewal (TokenRenewalScheduler.java)
+scheduler.scheduleAtFixedRate(() -> {
+    if (vaultClient.shouldRenew()) {
+        boolean success = vaultClient.renewToken();
+        if (!success) {
+            System.exit(1); // Terminate application on renewal failure
+        }
+    }
+}, 10, 10, TimeUnit.SECONDS);
+```
+
+### 2. Automatic Renewal of Database Dynamic Secrets
+Automatic renewal using Apache Commons DBCP2 Connection Pool and `ScheduledExecutorService`:
+
+```java
+// Schedule credential renewal at 80% of TTL
+long refreshDelay = (long) (dbSecret.getTtl() * 0.8 * 1000);
+scheduler.schedule(() -> refreshCredentials(), delayMs, TimeUnit.MILLISECONDS);
+```
+
+### 3. Web UI Features
+- **Display Secret Information**: KV, Database Dynamic/Static secret information.
+- **Test Database Connection**: Connects to the database using Vault Dynamic Secrets.
+- **Database Statistics**: Database connection statistics.
+- **Auto-Refresh**: Automatically refreshes the page every 30 seconds.
+- **Manual Refresh**: Manual secret refresh functionality.
+
+### 4. Servlet Endpoints
+- `GET /` - Main page (index.jsp)
+- `GET /refresh` - Refresh secrets
+
+## ⚙️ Configuration Options
+
+### Vault Configuration (vault.properties)
+```properties
+# Vault Server Settings
+vault.url=http://127.0.0.1:8200
+
+# AppRole Authentication Settings
+vault.auth.type=approle
+vault.approle.role_id=4060cafc-6cda-3bb4-a690-63177f9a5bc6
+vault.approle.secret_id=715d4f2c-20ed-6aac-235d-b075b65c9d74
+
+# Token renewal settings
+vault.token.renewal.enabled=true
+vault.token.renewal.threshold=0.8
+
+# KV Secrets Engine Settings
+vault.kv.path=my-vault-app-kv
+
+# Database Secrets Engine Settings
+vault.database.path=my-vault-app-database
+vault.database.dynamic.role=db-demo-dynamic
+vault.database.static.role=db-demo-static
+
+# Database credential source selection (one of kv, dynamic, static)
+vault.database.credential.source=kv
+#vault.database.credential.source=dynamic
+#vault.database.credential.source=static
+
+# KV-based Database credential settings (if source=kv)
+vault.database.kv.path=my-vault-app-kv/data/database
+vault.database.kv.refresh_interval=30
+
+# Database URL settings
+vault.database.url=jdbc:mysql://127.0.0.1:3306/mydb
+vault.database.driver=com.mysql.cj.jdbc.Driver
+```
+
+### Database Credential Source Selection
+
+You can select the database credential source in `vault.properties`:
+
+#### 1. KV Secret (Static Credentials)
+```properties
+vault.database.credential.source=kv
+vault.database.kv.path=my-vault-app-kv/data/database
+vault.database.kv.refresh_interval=30
+```
+- Periodically detects KV version changes.
+- Recreates the Connection Pool when the version changes.
+
+#### 2. Database Dynamic Secret (Dynamic Credentials)
+```properties
+vault.database.credential.source=dynamic
+```
+- TTL-based automatic renewal.
+- Issues a new credential and recreates the Connection Pool at 80% of TTL.
+
+#### 3. Database Static Secret (Statically Managed Credentials)
+```properties
+vault.database.credential.source=static
+```
+- Automatically rotated by Vault.
+- The user remains the same, so periodic renewal is not required in the application.
+
+### Environment Variable Configuration
+```bash
+# Vault Server Settings
+export VAULT_URL=http://127.0.0.1:8200
+
+# AppRole Authentication Settings (recommended to set in vault.properties)
+export VAULT_AUTH_TYPE=approle
+export VAULT_APPROLE_ROLE_ID=4060cafc-6cda-3bb4-a690-63177f9a5bc6
+export VAULT_APPROLE_SECRET_ID=715d4f2c-20ed-6aac-235d-b075b65c9d74
+```
+
+## 🏗️ Architecture
+
+### Directory Structure
+```
+java-web-tomcat-app/
+├── pom.xml                                    # Maven build configuration
+├── src/
+│   ├── main/
+│   │   ├── java/com/example/vaulttomcat/
+│   │   │   ├── config/
+│   │   │   │   ├── VaultConfig.java          # Vault configuration
+│   │   │   │   └── DatabaseConfig.java        # Database Connection Pool configuration
+│   │   │   ├── client/
+│   │   │   │   └── VaultClient.java          # Vault API client
+│   │   │   ├── service/
+│   │   │   │   ├── VaultSecretService.java   # Vault secret service
+│   │   │   │   └── DatabaseService.java      # Database service
+│   │   │   ├── servlet/
+│   │   │   │   ├── HomeServlet.java          # Main page Servlet
+│   │   │   │   └── RefreshServlet.java       # Secret renewal Servlet
+│   │   │   ├── listener/
+│   │   │   │   └── AppContextListener.java   # Application initialization listener
+│   │   │   └── model/
+│   │   │       └── SecretInfo.java           # Secret info model
+│   │   ├── resources/
+│   │   │   ├── vault.properties               # Vault configuration file
+│   │   │   └── logback.xml                    # Logging configuration
+│   │   └── webapp/
+│   │       ├── WEB-INF/
+│   │       │   ├── web.xml                    # Web application deployment descriptor
+│   │       │   └── jsp/
+│   │       │       └── index.jsp              # Main JSP page
+│   │       └── css/
+│   │           └── style.css                  # Stylesheet
+│   └── test/
+│       └── java/com/example/vaulttomcat/
+│           └── VaultClientTest.java
+└── README.md                                   # Usage guide
+```
+
+### Key Components
+- **AppContextListener**: Handles application initialization and shutdown.
+- **VaultClient**: Vault API client (Apache HttpClient + AppRole authentication).
+- **TokenRenewalScheduler**: Schedules automatic token renewal (checks every 10s).
+- **DatabaseConfig**: Manages Apache Commons DBCP2 Connection Pool.
+- **VaultSecretService**: Service for fetching Vault secrets.
+- **DatabaseService**: Service for database connection and statistics retrieval.
+- **HomeServlet/RefreshServlet**: Handles web requests.
+- **index.jsp**: Main web page (JSP + JSTL).
+
+### AppRole Authentication and Automatic Connection Pool Renewal
+- **AppRole Authentication**: Securely access Vault with Role ID + Secret ID.
+- **Token Auto-Renewal**: Checks token status every 10 seconds, renews at 80% of TTL.
+- **Initialization**: Creates a Connection Pool with a Vault Dynamic Secret.
+- **Scheduling**: Schedules credential renewal at 80% of TTL.
+- **Renewal**: Shuts down the old pool → fetches a new secret → creates a new pool.
+- **Repetition**: Schedules the next renewal with the new TTL.
+
+## 🛠️ Developer Guide
+
+### 1. Understanding the Project Structure
+```
+src/main/java/com/example/vaulttomcat/
+├── config/                           # Configuration classes
+├── client/                           # Vault API client
+├── service/                          # Business logic
+├── servlet/                          # Web servlets
+├── listener/                         # Application listeners
+└── model/                           # Data models
+```
+
+### 2. Implementing Key Features
+- **AppRole Authentication**: Vault authentication via Role ID + Secret ID.
+- **Token Auto-Renewal**: Automatic token renewal via `ScheduledExecutorService`.
+- **Vault Integration**: Vault API calls using Apache HttpClient.
+- **Connection Pool**: Database connection management using Apache Commons DBCP2.
+- **Automatic Renewal**: Credential renewal via `ScheduledExecutorService`.
+- **Web UI**: Displays secret information via JSP + JSTL.
+
+### 3. Extensible Structure
+- Add new secret engines.
+- Add new REST API endpoints.
+- Improve web UI and add features.
+
+## 🔧 Build and Run
+
+```bash
+# Build with Maven
+mvn clean package
+
+# Check that the WAR file was created
+ls -la target/vault-tomcat-app.war
+
+# Deploy to Tomcat
+cp target/vault-tomcat-app.war $TOMCAT_HOME/webapps/
+
+# Start Tomcat
+$TOMCAT_HOME/bin/startup.sh
+
+# Check logs
+tail -f $TOMCAT_HOME/logs/catalina.out
+
+# Run tests
+mvn test
+```
+
+## 🐛 Troubleshooting
+
+1.  **AppRole Authentication Failure**: Check Role ID and Secret ID in `vault.properties`.
+2.  **Token Renewal Failure**: Check Vault API permissions and network connection.
+3.  **Vault Connection Failure**: Check Vault settings in `vault.properties`.
+4.  **Database Connection Pool Initialization Failure**: Check MySQL settings and Vault Dynamic Secret.
+5.  **Tomcat Deployment Failure**: Check Java and Tomcat version compatibility.
+6.  **JSP Rendering Failure**: Check JSTL dependencies and configuration.
+7.  **Credential Renewal Failure**: Check Vault API permissions and network connection.
+8.  **Duplicate KV Secret Display**: A full Tomcat restart is required after configuration changes.
+9.  **Credential Source Setting Not Applied**: The WAR file must be rebuilt and redeployed after modifying `vault.properties`.
+
+### Important Notes on Changing Credential Source
+
+After changing the credential source (`kv`, `dynamic`, `static`), you must perform the following steps:
+
+```bash
+# 1. Completely stop Tomcat
+./bin/shutdown.sh
+sleep 5
+
+# 2. Delete previously deployed files
+rm -rf webapps/vault-tomcat-app
+rm -f webapps/vault-tomcat-app.war
+
+# 3. Rebuild the application
+mvn clean package
+
+# 4. Deploy the new WAR file
+cp target/vault-tomcat-app.war webapps/
+
+# 5. Restart Tomcat
+./bin/startup.sh
+```
+
+**Important**: Simply restarting Tomcat after a configuration change is not enough. A full redeployment is necessary because the previously deployed class files are cached.
+
+## 📚 References
+
+- [Vault AppRole Authentication](https://developer.hashicorp.com/vault/docs/auth/approle)
+- [Vault Token Renewal](https://developer.hashicorp.com/vault/docs/auth/token)
+- [Jakarta Servlet Official Documentation](https://jakarta.ee/specifications/servlet/)
+- [Jakarta Server Pages Official Documentation](https://jakarta.ee/specifications/pages/)
+- [Apache Commons DBCP2](https://commons.apache.org/proper/commons-dbcp/)
+- [Apache HttpClient 5](https://hc.apache.org/httpcomponents-client-5.2.x/)
+- [Maven Official Documentation](https://maven.apache.org/)
+- [Tomcat 10 Official Documentation](https://tomcat.apache.org/tomcat-10.0-doc/)
+
+# Vault Tomcat Web Application
+
 ## 📖 예제 목적 및 사용 시나리오
 
 이 예제는 **전통적인 Java Web Application**에서 Vault를 활용하여 시크릿을 안전하게 관리하는 방법을 보여줍니다.
@@ -293,15 +636,15 @@ mvn test
 
 ## 🐛 문제 해결
 
-1. **AppRole 인증 실패**: vault.properties의 Role ID와 Secret ID 확인
-2. **Token 갱신 실패**: Vault API 권한 및 네트워크 연결 확인
-3. **Vault 연결 실패**: vault.properties의 Vault 설정 확인
-4. **Database Connection Pool 초기화 실패**: MySQL 설정 및 Vault Dynamic Secret 확인
-5. **Tomcat 배포 실패**: Java 버전 및 Tomcat 버전 호환성 확인
-6. **JSP 렌더링 실패**: JSTL 의존성 및 설정 확인
-7. **자격증명 갱신 실패**: Vault API 권한 및 네트워크 연결 확인
-8. **KV Secret 중복 표시**: 설정 변경 후 Tomcat 완전 재시작 필요
-9. **자격증명 소스 설정 미적용**: vault.properties 수정 후 WAR 파일 재빌드 및 재배포 필요
+1.  **AppRole 인증 실패**: vault.properties의 Role ID와 Secret ID 확인
+2.  **Token 갱신 실패**: Vault API 권한 및 네트워크 연결 확인
+3.  **Vault 연결 실패**: vault.properties의 Vault 설정 확인
+4.  **Database Connection Pool 초기화 실패**: MySQL 설정 및 Vault Dynamic Secret 확인
+5.  **Tomcat 배포 실패**: Java 버전 및 Tomcat 버전 호환성 확인
+6.  **JSP 렌더링 실패**: JSTL 의존성 및 설정 확인
+7.  **자격증명 갱신 실패**: Vault API 권한 및 네트워크 연결 확인
+8.  **KV Secret 중복 표시**: 설정 변경 후 Tomcat 완전 재시작 필요
+9.  **자격증명 소스 설정 미적용**: vault.properties 수정 후 WAR 파일 재빌드 및 재배포 필요
 
 ### 자격증명 소스 변경 시 주의사항
 
