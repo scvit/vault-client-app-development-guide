@@ -1,3 +1,338 @@
+# Vault Spring Boot Web Application
+
+[아래 원본 한국어 섹션으로 이동](#vault-spring-boot-웹-애플리케이션)
+
+## 📖 Example Purpose and Usage Scenarios
+
+This example demonstrates how to manage Vault secrets in a web application using Spring Boot and Spring Cloud Vault Config.
+It uses Spring Cloud Vault Config to automatically inject secrets and displays secret information on a web UI via Thymeleaf.
+
+In Spring Boot, the database connection is managed through the `datasource` configuration. This example uses Dynamic Secrets provided by Vault to manage the database connection.
+The `DatabaseConfig` class uses the `@RefreshScope` annotation to update the database connection information in real-time.
+
+### 🎯 Key Scenarios
+- **AppRole Authentication**: Secure Vault access via Role ID + Secret ID.
+- **Automatic Secret Injection**: Automatic secret management via Spring Cloud Vault Config.
+- **Automatic Token Renewal**: Spring Cloud Vault handles token renewal automatically.
+- **Web UI Provision**: Visualization of secret information using Thymeleaf.
+- **Real-time Updates**: Automatic secret renewal via @RefreshScope.
+- **Database Integration**: Database connection and statistics retrieval using Vault Dynamic Secrets.
+
+### 🔐 Supported Secret Types
+- **KV v2**: Key-value store (direct Vault API call).
+- **Database Dynamic**: Dynamic database credentials (automatic DataSource configuration).
+- **Database Static**: Static database credentials (direct Vault API call).
+
+### 🎛️ Database Credential Source Selection
+The application can choose one of the following three credential sources for database access:
+- **KV Secret**: Static credentials (fetches database credentials from a KV Secret).
+- **Database Dynamic Secret**: Dynamic credentials (TTL-based automatic renewal).
+- **Database Static Secret**: Statically managed credentials (automatically rotated by Vault).
+
+### 💡 Development Considerations
+- **Spring Cloud Vault Config**: Automatically injects only Database Dynamic Secrets.
+- **@RefreshScope**: Uses the latest Dynamic Secret for database connections.
+- **Web UI**: User-friendly interface through Thymeleaf.
+- **Database Integration**: Database connection using Vault Dynamic Secrets.
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
+- Java 11 or higher.
+- Gradle 7.0 or higher.
+- Vault server (with development server setup completed).
+- MySQL (for database integration).
+
+### 2. Build and Run
+
+```bash
+# Build with Gradle
+./gradlew build
+
+# Run the application
+./gradlew bootRun
+
+# Or run the JAR file
+java -jar build/libs/vault-web-app-1.0.0.war
+```
+
+### 3. Access in Web Browser
+```
+http://localhost:8080/vault-web
+```
+
+## 📋 Key Features
+
+### 1. AppRole Authentication and Automatic Token Renewal
+Spring Cloud Vault automatically handles AppRole authentication and token renewal:
+
+```yaml
+# bootstrap.yml
+spring:
+  cloud:
+    vault:
+      authentication: APPROLE
+      app-role:
+        role-id: 4060cafc-6cda-3bb4-a690-63177f9a5bc6
+        secret-id: 715d4f2c-20ed-6aac-235d-b075b65c9d74
+```
+
+### 2. Automatic Secret Injection
+Spring Cloud Vault Config automatically injects Database Dynamic Secrets:
+
+```yaml
+# bootstrap.yml
+spring:
+  cloud:
+    vault:
+      authentication: APPROLE
+      app-role:
+        role-id: <Role ID from setup script>
+        secret-id: <Secret ID from setup script>
+      database:
+        enabled: true
+        backend: my-vault-app-database
+        role: db-demo-dynamic
+        username-property: spring.datasource.username
+        password-property: spring.datasource.password
+```
+
+**Important**: Spring Cloud Vault Config only automatically injects Database Dynamic Secrets. KV and Database Static Secrets are fetched by calling the Vault API directly.
+
+### 2. Web UI Features
+- **Display Secret Information**: KV, Database Dynamic/Static secret information.
+- **Test Database Connection**: Connects to the database using Vault Dynamic Secrets.
+- **Database Statistics**: Database connection statistics.
+- **Auto-Refresh**: Automatically refreshes the page every 30 seconds.
+- **Manual Refresh**: Manual secret refresh functionality.
+
+### 3. API Endpoints
+- `GET /` - Main page (index.html)
+- `GET /refresh` - Refresh secrets
+
+## ⚙️ Configuration Options
+
+### Vault Configuration (bootstrap.yml)
+```yaml
+spring:
+  cloud:
+    vault:
+      namespace: <namespace_name>
+      host: localhost
+      port: 8200
+      scheme: http
+      authentication: APPROLE
+      app-role:
+        role-id: <Role ID from setup script>
+        secret-id: <Secret ID from setup script>
+      database:
+        enabled: true
+        backend: my-vault-app-database
+        role: db-demo-dynamic
+        username-property: spring.datasource.username
+        password-property: spring.datasource.password
+```
+
+### Database Credential Source Selection (application.yml)
+```yaml
+vault:
+  database:
+    credential-source: kv  # Choose from kv, dynamic, static
+    kv:
+      path: my-vault-app-kv/data/database
+      username-key: database_username
+      password-key: database_password
+    dynamic:
+      role: db-demo-dynamic
+    static:
+      role: db-demo-static
+```
+
+#### 1. KV Secret (Static Credentials)
+```yaml
+vault:
+  database:
+    credential-source: kv
+```
+- Fetches database credentials from a KV Secret.
+- Uses `database_username` and `database_password` keys.
+- **Note**: Application restart is required if the credentials in the KV Secret change.
+
+#### 2. Database Dynamic Secret (Dynamic Credentials)
+```yaml
+vault:
+  database:
+    credential-source: dynamic
+```
+- TTL-based automatic renewal.
+- Utilizes Spring Cloud Vault Config's automatic injection.
+
+#### 3. Database Static Secret (Statically Managed Credentials)
+```yaml
+vault:
+  database:
+    credential-source: static
+```
+- Automatically rotated by Vault.
+- The user remains the same, so periodic renewal is not required in the application.
+
+### Application Configuration (application.yml)
+```yaml
+server:
+  port: 8080
+  servlet:
+    context-path: /vault-web
+
+spring:
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    cache: false
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/mydb
+    driver-class-name: com.mysql.cj.jdbc.Driver
+```
+
+### Environment Variable Configuration
+```bash
+# AppRole authentication settings (optional)
+export SPRING_CLOUD_VAULT_APP_ROLE_ROLE_ID=4060cafc-6cda-3bb4-a690-63177f9a5bc6
+export SPRING_CLOUD_VAULT_APP_ROLE_SECRET_ID=715d4f2c-20ed-6aac-235d-b075b65c9d74
+```
+
+## 🏗️ Architecture
+
+### Directory Structure
+```
+java-web-springboot-app/
+├── build.gradle                        # Gradle build configuration
+├── settings.gradle                     # Gradle project settings
+├── src/
+│   ├── main/
+│   │   ├── java/com/example/vaultweb/
+│   │   │   ├── VaultWebApplication.java       # Spring Boot main
+│   │   │   ├── config/
+│   │   │   │   ├── VaultConfig.java           # Vault configuration
+│   │   │   │   └── DatabaseConfig.java        # Database configuration
+│   │   │   ├── controller/
+│   │   │   │   └── HomeController.java        # Main controller
+│   │   │   ├── service/
+│   │   │   │   ├── VaultSecretService.java    # Vault secret service
+│   │   │   │   └── DatabaseService.java       # Database service
+│   │   │   └── model/
+│   │   │       └── SecretInfo.java            # Secret info model
+│   │   ├── resources/
+│   │   │   ├── application.yml                # Spring Boot configuration
+│   │   │   ├── bootstrap.yml                  # Vault bootstrap configuration
+│   │   │   ├── logback-spring.xml             # Logging configuration
+│   │   │   └── templates/
+│   │   │       └── index.html                  # Main Thymeleaf page
+│   └── test/
+│       └── java/com/example/vaultweb/
+│           └── VaultWebApplicationTest.java
+└── README.md                           # Usage guide
+```
+
+### Key Components
+- **VaultWebApplication**: Main Spring Boot application.
+- **VaultConfig**: Manages Vault configuration.
+- **DatabaseConfig**: Manages Database configuration (renews Dynamic Secrets with @RefreshScope).
+- **VaultSecretService**: Service for fetching Vault secrets (direct calls for KV, Static Secrets).
+- **DatabaseService**: Service for database connection and statistics retrieval.
+- **HomeController**: Handles web requests.
+- **index.html**: Main Thymeleaf page.
+
+### Utilizing Spring Cloud Vault Config
+- **Automatic Injection of Database Dynamic Secrets**: Automatically injected into the DataSource.
+- **@RefreshScope**: Uses the latest Dynamic Secret for database connections.
+- **VaultTemplate**: Direct calls for KV and Static Secrets.
+- **Automatic Token Renewal**: Handled automatically by Spring Cloud Vault.
+
+## 🛠️ Developer Guide
+
+### 1. Understanding the Project Structure
+```
+src/main/java/com/example/vaultweb/
+├── VaultWebApplication.java          # Spring Boot main
+├── config/                           # Configuration classes
+├── controller/                       # Web controllers
+├── service/                          # Business logic
+└── model/                           # Data models
+```
+
+### 2. Implementing Key Features
+- **AppRole Authentication**: Spring Cloud Vault automatically handles AppRole authentication and token renewal.
+- **Vault Integration**: Spring Cloud Vault Config (Dynamic Secret) + Vault API (KV, Static Secret).
+- **Secret Retrieval**: Fetches KV, Database Dynamic, and Static secrets.
+- **Web UI**: Displays secret information via Thymeleaf.
+- **Database Integration**: Connects to the database using Vault Dynamic Secrets.
+
+### 3. Extensible Structure
+- Add new secret engines.
+- Add new REST API endpoints.
+- Improve web UI and add features.
+
+## 🔧 Build and Run
+
+```bash
+# Build with Gradle
+./gradlew clean build
+
+# Run the application
+./gradlew bootRun
+
+# Create WAR file
+./gradlew war
+
+# Run tests
+./gradlew test
+```
+
+## 🐛 Troubleshooting
+
+1.  **Vault Connection Failure**: Check Vault settings in `bootstrap.yml`.
+2.  **AppRole Authentication Failure**: Verify Role ID and Secret ID are correct, and check if AppRole is enabled on the Vault server.
+3.  **Database Dynamic Secret Injection Failure**: Check Vault AppRole permissions and Database configuration.
+4.  **Database Connection Failure**: Check MySQL settings and Vault Dynamic Secret.
+5.  **Thymeleaf Rendering Failure**: Check Thymeleaf dependencies and configuration.
+6.  **KV/Static Secret Retrieval Failure**: Check VaultTemplate configuration and Vault API permissions.
+7.  **Credential Source Setting Not Applied**: Application restart is required after modifying `application.yml`.
+8.  **Database Credential Source Change Failure**: Check Vault API permissions and network connection.
+
+### Important Notes on Changing Credential Source
+
+After changing the credential source (`kv`, `dynamic`, `static`), you must perform the following steps:
+
+```bash
+# 1. Stop the application
+# Ctrl+C or terminate the process
+
+# 2. Modify application.yml
+# Change the vault.database.credential-source value to the desired source
+
+# 3. Restart the application
+./gradlew bootRun
+```
+
+**Important**: You must restart the application after changing the configuration for the new credential source to be applied. Although @RefreshScope detects configuration changes, the database connection is determined at initialization, so a restart is necessary.
+
+### Tested Credential Sources
+
+✅ **KV Secret**: Successfully fetched `database_username` and `database_password` from `my-vault-app-kv/data/database`.  
+✅ **Database Dynamic Secret**: Successfully fetched dynamic credentials from `my-vault-app-database/creds/db-demo-dynamic`.  
+✅ **Database Static Secret**: Successfully fetched static credentials from `my-vault-app-database/static-creds/db-demo-static`.
+
+All credential sources work correctly, and you can see which credential source is in use in the logs when the configuration is changed.
+
+## 📚 References
+
+- [Spring Cloud Vault Official Documentation](https://spring.io/projects/spring-cloud-vault)
+- [Spring Boot Official Documentation](https://spring.io/projects/spring-boot)
+- [Vault AppRole Auth Method](https://www.vaultproject.io/docs/auth/approle)
+- [Thymeleaf Template Engine](https://www.thymeleaf.org/)
+- [Gradle Build Tool](https://gradle.org/)
+- [MySQL Connector/J](https://dev.mysql.com/doc/connector-j/8.0/en/)
+
 # Vault Spring Boot 웹 애플리케이션
 
 ## 📖 예제 목적 및 사용 시나리오

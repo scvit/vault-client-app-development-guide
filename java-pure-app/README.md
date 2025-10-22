@@ -1,3 +1,238 @@
+# Vault Java Client Application
+
+[아래 원본 한국어 섹션으로 이동](#vault-java-클라이언트-애플리케이션)
+
+## 📖 Example Purpose and Usage Scenarios
+
+This example is a reference application for Vault integration development.
+If needed only for initial application startup, it makes an API call once and then utilizes the cache for subsequent runs to reduce memory usage.
+The example is implemented to periodically fetch and renew secrets.
+It is designed to call the API directly rather than being implemented as a library solely for Vault.
+
+### 🎯 Key Scenarios
+- **Initial Startup**: Fetches secrets from Vault only once when the application starts.
+- **Real-time Renewal**: Periodically renews secrets to maintain the latest state.
+- **Cache Utilization**: Minimizes unnecessary API calls through version/TTL-based caching.
+
+### 🔐 Supported Secret Types
+- **KV v2**: Key-value store (version-based caching).
+- **Database Dynamic**: Dynamic database credentials (TTL-based renewal).
+- **Database Static**: Static database credentials (time-based caching).
+
+### 💡 Development Considerations
+- **Memory Management**: Optimizes memory usage through secret caching.
+- **Error Handling**: Handles exceptions such as network errors and authentication failures.
+- **Security**: Meets security requirements like token renewal and secret encryption.
+- **Performance**: Optimizes performance through asynchronous processing, connection pooling, etc.
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
+- Tested on Java 11 or higher.
+- Maven 3.6 or higher.
+- Vault server (with development server setup completed).
+
+### 2. Build and Run
+
+```bash
+# Build the project
+mvn clean package
+
+# Run the application
+java -jar target/vault-java-app.jar
+
+# Or run directly with Maven
+mvn exec:java -Dexec.mainClass="com.example.vault.VaultApplication"
+```
+
+### 3. Modify Configuration File
+You can change the Vault connection settings by modifying the `src/main/resources/config.properties` file.
+
+## 📋 Example Output
+
+```
+🚀 Starting Vault Java Client Application
+✅ Vault login successful (TTL: 60s)
+✅ KV secret renewal scheduler started (interval: 5s)
+✅ Database Dynamic secret renewal scheduler started (interval: 5s)
+✅ Database Static secret renewal scheduler started (interval: 10s)
+
+📖 Example Purpose and Usage Scenarios
+This example is a reference application for Vault integration development.
+If needed only for initial application startup, it makes an API call once and then utilizes the cache for subsequent runs to reduce memory usage.
+The example is implemented to periodically fetch and renew secrets.
+
+🔧 Supported Features:
+- KV v2 Secret Engine (version-based caching)
+- Database Dynamic Secret Engine (TTL-based renewal)
+- Database Static Secret Engine (time-based caching)
+- Automatic Token Renewal
+- Entity-based Permission Management
+
+⚙️ Current Configuration:
+- Entity: my-vault-app
+- Vault URL: http://127.0.0.1:8200
+- KV Enabled: true
+- Database Dynamic Enabled: true
+- Database Static Enabled: true
+
+🔄 Starting secret renewal... (Press Ctrl+C to exit)
+
+=== KV Secret Refresh ===
+✅ KV secret fetch successful (version: 11)
+📦 KV Secret Data (version: 11):
+{"api_key":"myapp-api-key-123456","database_url":"mysql://localhost:3306/mydb"}
+
+=== Database Dynamic Secret Refresh ===
+✅ Database Dynamic secret fetch successful (TTL: 60s)
+🗄️ Database Dynamic Secret (TTL: 60s):
+  username: v-approle-db-demo-dy-JRHTDBobE5o
+  password: qLteLnVHZdBcmR-sJS1b
+
+=== Database Static Secret Refresh ===
+✅ Database Static secret fetch successful (TTL: 3600s)
+🔒 Database Static Secret (TTL: 3600s):
+  username: my-vault-app-static
+  password: OfK6S-6R2PiWA0C8Fqxj
+
+=== Database Dynamic Secret Refresh ===
+✅ Using cached Database Dynamic secret (TTL: 60s)
+🗄️ Database Dynamic Secret (TTL: 56s):
+  username: v-approle-db-demo-dy-JRHTDBobE5o
+  password: qLteLnVHZdBcmR-sJS1b
+```
+
+## ⚙️ Configuration Options
+
+### Configuration Priority
+
+Generally, predefined configurations are defined in the `config.properties` file. Since the `secret_id` used for Vault authentication expires after issuance, it is implemented to be overridden by a system property at runtime.
+
+1.  **System Properties** (`-D` option) - Highest priority
+2.  **config.properties file** - Default value
+
+### How to Use System Properties
+```bash
+# Override settings with system properties at runtime
+java -Dvault.role_id=your-role-id \
+     -Dvault.secret_id=your-secret-id \
+     -Dvault.url=http://your-vault-server:8200 \
+     -jar target/vault-java-app.jar
+
+# Or individual settings
+java -Dvault.secret_id=3ee5080b-c9b3-2714-799c-f8d45a715625 -jar target/vault-java-app.jar
+```
+
+### Vault Server Settings
+```properties
+# Entity name (required)
+vault.entity=my-vault-app
+# Vault server address
+vault.url=http://127.0.0.1:8200
+# Vault namespace (optional)
+vault.namespace=
+# AppRole authentication info (required)
+vault.role_id=7fb49dd0-4b87-19cd-7b72-a7e21e5c543e
+vault.secret_id=475a6500-f9f8-fdd4-ec30-54fadcad926e
+```
+
+### Secret Engine Settings
+```properties
+# KV Secret settings
+secret.kv.enabled=true
+secret.kv.path=database
+secret.kv.refresh_interval=5
+
+# Database Dynamic Secret settings
+secret.database.dynamic.enabled=true
+secret.database.dynamic.role_id=db-demo-dynamic
+
+# Database Static Secret settings
+secret.database.static.enabled=true
+secret.database.static.role_id=db-demo-static
+```
+
+### HTTP Settings
+```properties
+# HTTP request timeout (seconds)
+http.timeout=30
+# Maximum response size (bytes)
+http.max_response_size=4096
+```
+
+## 🏗️ Architecture
+
+### Class Structure
+```
+com.example.vault/
+├── VaultApplication.java          # Main application
+├── config/
+│   └── VaultConfig.java           # Configuration management
+└── client/
+    └── VaultClient.java           # Vault client
+```
+
+### Key Components
+- **VaultApplication**: Main application logic, scheduler management.
+- **VaultConfig**: Loads and manages configuration files.
+- **VaultClient**: Vault API integration, secret retrieval, caching.
+
+### Caching Strategy
+- **KV v2**: Version-based caching (renews only when version changes).
+- **Database Dynamic**: TTL-based caching (10-second threshold).
+- **Database Static**: Time-based caching (5-minute interval).
+
+### Real-time TTL Calculation
+- Displays the real-time decrease of the TTL for Database Dynamic/Static Secrets.
+- Calculates the remaining TTL by subtracting the elapsed time from the cached TTL.
+- Prevents negative values with `Math.max(0, remainingTtl)`.
+
+## 🛠️ Developer Guide
+
+### 1. Understanding the Project Structure
+```
+src/main/java/com/example/vault/
+├── VaultApplication.java          # Main application
+├── config/VaultConfig.java        # Configuration class
+└── client/VaultClient.java        # Vault client
+
+src/main/resources/
+└── config.properties              # Configuration file
+```
+
+### 2. Implementing Key Features
+- **Authentication**: AppRole-based Vault authentication.
+- **Token Management**: Automatic token renewal.
+- **Secret Retrieval**: Fetches KV, Database Dynamic, and Static secrets.
+- **Caching**: Efficient secret caching strategy.
+- **TTL Management**: Real-time TTL calculation and display.
+
+### 3. Extensible Structure
+- Add new secret engines.
+- Implement custom caching strategies.
+- Enhance monitoring and logging.
+
+## 🔧 Build and Run
+
+```bash
+mvn clean package
+java -jar target/vault-java-app.jar
+```
+
+## 🐛 Troubleshooting
+
+1.  **Vault Connection Failure**: Check URL, namespace.
+2.  **Authentication Failure**: Check Role ID, Secret ID.
+3.  **Permission Error**: Check Entity policies.
+4.  **Secret Retrieval Failure**: Check if the secret engine is enabled.
+
+## 📚 References
+
+- [Vault API Documentation](https://www.vaultproject.io/api-docs)
+- [AppRole Auth Method](https://www.vaultproject.io/docs/auth/approle)
+- [KV v2 Secrets Engine](https://www.vaultproject.io/docs/secrets/kv/kv-v2)
+- [Database Secrets Engine](https://www.vaultproject.io/docs/secrets/databases)
+
 # Vault Java 클라이언트 애플리케이션
 
 ## 📖 예제 목적 및 사용 시나리오
