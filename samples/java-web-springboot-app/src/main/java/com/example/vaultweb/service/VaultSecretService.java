@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.vault.core.VaultTemplate;
 import org.springframework.vault.support.VaultResponse;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -55,8 +54,15 @@ public class VaultSecretService {
     try {
       logger.info("=== KV Secret Refresh ===");
 
+      // 설정에서 KV 경로 가져오기
+      String kvPath = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getKv() != null
+          && vaultConfig.getDatabase().getKv().getPath() != null
+              ? vaultConfig.getDatabase().getKv().getPath()
+              : "my-vault-app-kv/data/database";
+
       // Vault에서 직접 KV 데이터 조회
-      VaultResponse response = vaultTemplate.read("my-vault-app-kv/data/database");
+      VaultResponse response = vaultTemplate.read(kvPath);
       Map<String, Object> kvData = new HashMap<>();
 
       if (response != null && response.getData() != null) {
@@ -77,7 +83,7 @@ public class VaultSecretService {
         logger.info("✅ KV 시크릿 조회 성공 (버전: {})", version);
         logger.info("📦 KV Secret Data (version: {}): {}", version, kvData);
 
-        SecretInfo secretInfo = new SecretInfo("KV", "my-vault-app-kv/data/database", kvData);
+        SecretInfo secretInfo = new SecretInfo("KV", kvPath, kvData);
         secretInfo.setVersion(version);
         return secretInfo;
       } else {
@@ -86,14 +92,19 @@ public class VaultSecretService {
         kvData.put("database_url", kvDatabaseUrl != null ? kvDatabaseUrl : "");
         logger.info("📦 KV Secret Data (from config): {}", kvData);
 
-        SecretInfo secretInfo = new SecretInfo("KV", "my-vault-app-kv/data/database", kvData);
+        SecretInfo secretInfo = new SecretInfo("KV", kvPath, kvData);
         secretInfo.setVersion("1");
         return secretInfo;
       }
 
     } catch (Exception e) {
       logger.error("❌ KV 시크릿 조회 실패: {}", e.getMessage());
-      return createErrorSecretInfo("KV", "my-vault-app-kv/data/database", e.getMessage());
+      String kvPath = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getKv() != null
+          && vaultConfig.getDatabase().getKv().getPath() != null
+              ? vaultConfig.getDatabase().getKv().getPath()
+              : "my-vault-app-kv/data/database";
+      return createErrorSecretInfo("KV", kvPath, e.getMessage());
     }
   }
 
@@ -104,16 +115,32 @@ public class VaultSecretService {
     try {
       logger.info("=== Database Dynamic Secret Refresh ===");
 
+      // 설정에서 Database backend와 role 가져오기
+      String backend = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getBackend() != null
+              ? vaultConfig.getDatabase().getBackend()
+              : "my-vault-app-database";
+
+      String role = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getDynamic() != null
+          && vaultConfig.getDatabase().getDynamic().getRole() != null
+              ? vaultConfig.getDatabase().getDynamic().getRole()
+              : (vaultConfig.getDatabase() != null
+                  && vaultConfig.getDatabase().getRole() != null
+                      ? vaultConfig.getDatabase().getRole()
+                      : "db-demo-dynamic");
+
+      String path = backend + "/creds/" + role;
+
       // Vault API 직접 호출로 최신 credential 조회
-      VaultResponse response = vaultTemplate.read("my-vault-app-database/creds/db-demo-dynamic");
+      VaultResponse response = vaultTemplate.read(path);
 
       if (response != null && response.getData() != null) {
         Map<String, Object> dbData = new HashMap<>();
         dbData.put("username", response.getData().get("username"));
         dbData.put("password", response.getData().get("password"));
 
-        SecretInfo secretInfo = new SecretInfo("Database Dynamic",
-            "my-vault-app-database/creds/db-demo-dynamic", dbData);
+        SecretInfo secretInfo = new SecretInfo("Database Dynamic", path, dbData);
 
         // Lease 정보 설정
         if (response.getLeaseId() != null) {
@@ -135,8 +162,20 @@ public class VaultSecretService {
 
     } catch (Exception e) {
       logger.error("❌ Database Dynamic 시크릿 조회 실패: {}", e.getMessage());
-      return createErrorSecretInfo("Database Dynamic",
-          "my-vault-app-database/creds/db-demo-dynamic", e.getMessage());
+      String backend = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getBackend() != null
+              ? vaultConfig.getDatabase().getBackend()
+              : "my-vault-app-database";
+      String role = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getDynamic() != null
+          && vaultConfig.getDatabase().getDynamic().getRole() != null
+              ? vaultConfig.getDatabase().getDynamic().getRole()
+              : (vaultConfig.getDatabase() != null
+                  && vaultConfig.getDatabase().getRole() != null
+                      ? vaultConfig.getDatabase().getRole()
+                      : "db-demo-dynamic");
+      String path = backend + "/creds/" + role;
+      return createErrorSecretInfo("Database Dynamic", path, e.getMessage());
     }
   }
 
@@ -147,7 +186,13 @@ public class VaultSecretService {
     try {
       logger.info("=== Database Dynamic Secret API Call ===");
 
-      String path = "my-vault-app-database/creds/" + roleName;
+      // 설정에서 Database backend 가져오기
+      String backend = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getBackend() != null
+              ? vaultConfig.getDatabase().getBackend()
+              : "my-vault-app-database";
+
+      String path = backend + "/creds/" + roleName;
       VaultResponse response = vaultTemplate.read(path);
 
       if (response != null && response.getData() != null) {
@@ -170,14 +215,27 @@ public class VaultSecretService {
     try {
       logger.info("=== Database Static Secret Refresh ===");
 
+      // 설정에서 Database backend와 static role 가져오기
+      String backend = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getBackend() != null
+              ? vaultConfig.getDatabase().getBackend()
+              : "my-vault-app-database";
+
+      String role = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getStaticCreds() != null
+          && vaultConfig.getDatabase().getStaticCreds().getRole() != null
+              ? vaultConfig.getDatabase().getStaticCreds().getRole()
+              : "db-demo-static";
+
+      String path = backend + "/static-creds/" + role;
+
       // Vault API를 직접 호출하여 Static 시크릿 조회
-      VaultResponse response = vaultTemplate.read("my-vault-app-database/static-creds/db-demo-static");
+      VaultResponse response = vaultTemplate.read(path);
 
       if (response != null && response.getData() != null) {
         Map<String, Object> dbData = (Map<String, Object>) response.getData();
 
-        SecretInfo secretInfo = new SecretInfo("Database Static",
-            "my-vault-app-database/static-creds/db-demo-static", dbData);
+        SecretInfo secretInfo = new SecretInfo("Database Static", path, dbData);
         secretInfo.setTtl(3600L);
         secretInfo.setRenewable(false);
 
@@ -192,8 +250,17 @@ public class VaultSecretService {
 
     } catch (Exception e) {
       logger.error("❌ Database Static 시크릿 조회 실패: {}", e.getMessage());
-      return createErrorSecretInfo("Database Static",
-          "my-vault-app-database/static-creds/db-demo-static", e.getMessage());
+      String backend = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getBackend() != null
+              ? vaultConfig.getDatabase().getBackend()
+              : "my-vault-app-database";
+      String role = vaultConfig.getDatabase() != null
+          && vaultConfig.getDatabase().getStaticCreds() != null
+          && vaultConfig.getDatabase().getStaticCreds().getRole() != null
+              ? vaultConfig.getDatabase().getStaticCreds().getRole()
+              : "db-demo-static";
+      String path = backend + "/static-creds/" + role;
+      return createErrorSecretInfo("Database Static", path, e.getMessage());
     }
   }
 

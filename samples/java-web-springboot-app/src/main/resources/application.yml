@@ -5,6 +5,7 @@ server:
 
 vault:
   database:
+    backend: my-vault-app-database  # Database secret backend 이름
     credential-source: kv  # kv, dynamic, static 중 선택
     kv:
       path: my-vault-app-kv/data/database

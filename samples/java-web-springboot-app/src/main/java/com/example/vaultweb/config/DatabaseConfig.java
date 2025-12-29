@@ -53,10 +53,10 @@ public class DatabaseConfig {
       logger.info("Setting default driver: {}", this.driverClassName);
     }
 
-    // URL이 null인 경우 기본값 설정
+    // URL이 null인 경우 에러 로깅 (설정 파일에서 필수)
     if (this.url == null) {
-      this.url = "jdbc:mysql://127.0.0.1:3306/mydb";
-      logger.info("Setting default URL: {}", this.url);
+      logger.error("❌ Database URL이 설정되지 않았습니다. application.yml에서 spring.datasource.url을 설정해주세요.");
+      throw new IllegalStateException("Database URL이 설정되지 않았습니다.");
     }
 
     // Vault 설정에서 자격증명 소스 확인
@@ -75,9 +75,21 @@ public class DatabaseConfig {
           // KV Secret에서 자격증명 조회
           var kvSecret = vaultSecretService.getKvSecret();
           if (kvSecret != null && kvSecret.getData() != null) {
-            finalUsername = (String) kvSecret.getData().get("database_username");
-            finalPassword = (String) kvSecret.getData().get("database_password");
-            logger.info("✅ KV Secret 자격증명 사용: {}", finalUsername);
+            // 설정에서 키 이름 가져오기
+            String usernameKey = vaultConfig.getDatabase() != null
+                && vaultConfig.getDatabase().getKv() != null
+                && vaultConfig.getDatabase().getKv().getUsernameKey() != null
+                    ? vaultConfig.getDatabase().getKv().getUsernameKey()
+                    : "database_username";
+            String passwordKey = vaultConfig.getDatabase() != null
+                && vaultConfig.getDatabase().getKv() != null
+                && vaultConfig.getDatabase().getKv().getPasswordKey() != null
+                    ? vaultConfig.getDatabase().getKv().getPasswordKey()
+                    : "database_password";
+
+            finalUsername = (String) kvSecret.getData().get(usernameKey);
+            finalPassword = (String) kvSecret.getData().get(passwordKey);
+            logger.info("✅ KV Secret 자격증명 사용: {} (키: {}/{})", finalUsername, usernameKey, passwordKey);
           }
           break;
 
@@ -96,13 +108,17 @@ public class DatabaseConfig {
           // Database Dynamic Secret에서 자격증명 조회
           String role = vaultConfig.getDatabase() != null
               && vaultConfig.getDatabase().getDynamic() != null
+              && vaultConfig.getDatabase().getDynamic().getRole() != null
                   ? vaultConfig.getDatabase().getDynamic().getRole()
-                  : "db-demo-dynamic";
+                  : (vaultConfig.getDatabase() != null
+                      && vaultConfig.getDatabase().getRole() != null
+                          ? vaultConfig.getDatabase().getRole()
+                          : "db-demo-dynamic");
           var dynamicSecret = vaultSecretService.getDatabaseCredentials(role);
           if (dynamicSecret != null && dynamicSecret.getData() != null) {
             finalUsername = (String) dynamicSecret.getData().get("username");
             finalPassword = (String) dynamicSecret.getData().get("password");
-            logger.info("✅ Dynamic Secret 자격증명 사용: {}", finalUsername);
+            logger.info("✅ Dynamic Secret 자격증명 사용: {} (role: {})", finalUsername, role);
           }
           break;
       }

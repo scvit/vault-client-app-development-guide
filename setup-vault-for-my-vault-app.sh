@@ -435,11 +435,11 @@ main() {
     echo "============================================================================="
     echo ""
     
-    # 1. Vault 연결 확인
-    check_vault_connection
-    
-    # 2. 환경변수 설정
+    # 1. 환경변수 설정 (먼저 설정)
     setup_environment
+    
+    # 2. Vault 연결 확인 (환경변수 설정 후)
+    check_vault_connection
     
     # 3. AppRole 인증 활성화
     enable_approle
