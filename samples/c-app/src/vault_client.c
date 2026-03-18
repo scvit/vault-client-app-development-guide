@@ -48,6 +48,8 @@ int vault_client_init(vault_client_t *client, app_config_t *config) {
     curl_easy_setopt(client->curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(client->curl, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(client->curl, CURLOPT_SSL_VERIFYHOST, 0L);
+
+
     
     client->token[0] = '\0';
     client->token_expiry = 0;
@@ -148,6 +150,17 @@ int vault_login(vault_client_t *client, const char *role_id, const char *secret_
     // Content-Type 헤더 설정
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
+     
+    
+    // 네임스페이스 헤더 추가
+    if (client->config && client->config->vault_namespace[0]) {
+    char ns_header[256];
+    snprintf(ns_header, sizeof(ns_header), "X-Vault-Namespace: %s", 
+            client->config->vault_namespace);
+    headers = curl_slist_append(headers, ns_header);
+   }
+
+
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     
     // 요청 실행
@@ -163,6 +176,7 @@ int vault_login(vault_client_t *client, const char *role_id, const char *secret_
     }
     
     // 응답 파싱
+    // printf("🔍 Login response: %s\n", response.data);
     json_object *json_response = json_tokener_parse(response.data);
     if (!json_response) {
         fprintf(stderr, "Failed to parse login response\n");
@@ -257,6 +271,9 @@ int vault_renew_token(vault_client_t *client) {
     // HTTP 상태 코드 확인
     long http_code;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    
+
     if (http_code != 200) {
         fprintf(stderr, "Token renewal failed with HTTP %ld\n", http_code);
         printf("Response: %s\n", response.data);
@@ -808,6 +825,16 @@ int vault_get_kv_secret_direct(vault_client_t *client, json_object **secret_data
     snprintf(auth_header, sizeof(auth_header), "X-Vault-Token: %s", client->token);
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, auth_header);
+
+    // 네임스페이스 헤더 추가
+    if (client->config && client->config->vault_namespace[0]) {
+    char ns_header[256];
+    snprintf(ns_header, sizeof(ns_header), "X-Vault-Namespace: %s", 
+            client->config->vault_namespace);
+    headers = curl_slist_append(headers, ns_header);
+    }
+
+
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     
     // 요청 실행
@@ -824,6 +851,15 @@ int vault_get_kv_secret_direct(vault_client_t *client, json_object **secret_data
     // HTTP 상태 코드 확인
     long http_code;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+     // 412 에러 처리
+    if (http_code == 412) {
+        printf("⚠️ ETag cache expired (HTTP 412), retrying with fresh connection...\n");
+        free(response.data);
+        curl_easy_cleanup(curl);
+        return vault_get_kv_secret_direct(client, secret_data);  // 재시도
+    }
+
     if (http_code != 200) {
         fprintf(stderr, "KV secret request failed with HTTP %ld\n", http_code);
         printf("Response: %s\n", response.data);
